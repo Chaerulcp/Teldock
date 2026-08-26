@@ -45,53 +45,116 @@ async function uploadFile(req, res) {
             encrypt
         });
 
-        // Create file record
-        const uploadedFile = await File.create({
-            userId: user.userId,
-            folderId: folderId || null,
-            telegramChatId: result.telegramChatId,
-            telegramMessageId: result.telegramMessageId,
-            telegramFileId: result.telegramFileId,
-            originalFilename: file.originalname,
-            displayFilename: sanitizeFilename(file.originalname),
-            mimeType: file.mimetype,
-            fileSize: file.size,
-            isChunked: result.isChunked,
-            partCount: result.partCount,
-            isEncrypted: result.isEncrypted,
-            encryptionSalt: result.encryptionSalt,
-            checksum: result.checksum
-        }, { transaction: t });
+        const displayName = sanitizeFilename(file.originalname);
 
-        // Persist part records
-        for (const part of result.parts) {
-            await FilePart.create({
-                fileId: uploadedFile.id,
-                partIndex: part.partIndex,
-                telegramChatId: part.telegramChatId,
-                telegramMessageId: part.telegramMessageId,
-                telegramFileId: part.telegramFileId,
-                partSize: part.partSize,
-                plainSize: part.plainSize,
-                encryptionIv: part.encryptionIv,
-                checksum: part.checksum
+        // Version-on-overwrite: if a file with the same display name already exists
+        // in this folder, snapshot its current state then replace it in place.
+        const existing = await File.findOne({
+            where: {
+                userId: user.userId,
+                folderId: folderId || null,
+                displayFilename: displayName,
+                isDeleted: false
+            },
+            include: [{ model: FilePart, as: 'parts' }],
+            transaction: t
+        });
+
+        let uploadedFile;
+        let replaced = false;
+
+        if (existing) {
+            replaced = true;
+            const previousSize = Number(existing.fileSize) || 0;
+
+            // Snapshot the current state as a version
+            await versionHistoryService.snapshotCurrent(existing, existing.parts || [], { transaction: t });
+
+            // Replace parts with the new upload's parts
+            await FilePart.destroy({ where: { fileId: existing.id }, transaction: t });
+
+            existing.telegramChatId = result.telegramChatId;
+            existing.telegramMessageId = result.telegramMessageId;
+            existing.telegramFileId = result.telegramFileId;
+            existing.originalFilename = file.originalname;
+            existing.mimeType = file.mimetype;
+            existing.fileSize = file.size;
+            existing.isChunked = result.isChunked;
+            existing.partCount = result.partCount;
+            existing.isEncrypted = result.isEncrypted;
+            existing.encryptionSalt = result.encryptionSalt;
+            existing.checksum = result.checksum;
+            await existing.save({ transaction: t });
+
+            for (const part of result.parts) {
+                await FilePart.create({
+                    fileId: existing.id,
+                    partIndex: part.partIndex,
+                    telegramChatId: part.telegramChatId,
+                    telegramMessageId: part.telegramMessageId,
+                    telegramFileId: part.telegramFileId,
+                    partSize: part.partSize,
+                    plainSize: part.plainSize,
+                    encryptionIv: part.encryptionIv,
+                    checksum: part.checksum
+                }, { transaction: t });
+            }
+
+            uploadedFile = existing;
+
+            // Adjust storage usage by the delta (new size - old size)
+            const delta = Number(file.size) - previousSize;
+            await User.update(
+                { storageUsedBytes: sequelize.literal(`GREATEST(\`storageUsedBytes\` + ${delta}, 0)`) },
+                { where: { id: user.userId }, transaction: t }
+            );
+        } else {
+            // Create a new file record
+            uploadedFile = await File.create({
+                userId: user.userId,
+                folderId: folderId || null,
+                telegramChatId: result.telegramChatId,
+                telegramMessageId: result.telegramMessageId,
+                telegramFileId: result.telegramFileId,
+                originalFilename: file.originalname,
+                displayFilename: displayName,
+                mimeType: file.mimetype,
+                fileSize: file.size,
+                isChunked: result.isChunked,
+                partCount: result.partCount,
+                isEncrypted: result.isEncrypted,
+                encryptionSalt: result.encryptionSalt,
+                checksum: result.checksum
             }, { transaction: t });
-        }
 
-        // Update user storage usage (column is camelCase `storageUsedBytes`)
-        await User.update(
-            { storageUsedBytes: sequelize.literal(`GREATEST(\`storageUsedBytes\` + ${Number(file.size)}, 0)`) },
-            { where: { id: user.userId }, transaction: t }
-        );
+            for (const part of result.parts) {
+                await FilePart.create({
+                    fileId: uploadedFile.id,
+                    partIndex: part.partIndex,
+                    telegramChatId: part.telegramChatId,
+                    telegramMessageId: part.telegramMessageId,
+                    telegramFileId: part.telegramFileId,
+                    partSize: part.partSize,
+                    plainSize: part.plainSize,
+                    encryptionIv: part.encryptionIv,
+                    checksum: part.checksum
+                }, { transaction: t });
+            }
+
+            await User.update(
+                { storageUsedBytes: sequelize.literal(`GREATEST(\`storageUsedBytes\` + ${Number(file.size)}, 0)`) },
+                { where: { id: user.userId }, transaction: t }
+            );
+        }
 
         await t.commit();
 
-        console.log(`✅ Upload complete: ${uploadedFile.displayFilename} (${result.partCount} part(s), encrypted=${result.isEncrypted})`);
+        console.log(`✅ Upload complete: ${uploadedFile.displayFilename} (${result.partCount} part(s), encrypted=${result.isEncrypted}${replaced ? ', new version' : ''})`);
 
         res.status(201).json({
             success: true,
-            message: 'File uploaded successfully',
-            data: { file: uploadedFile }
+            message: replaced ? 'File updated (previous saved as version)' : 'File uploaded successfully',
+            data: { file: uploadedFile, versioned: replaced }
         });
 
     } catch (error) {
@@ -499,7 +562,7 @@ async function revertVersion(req, res) {
             });
         }
 
-        const version = await versionHistoryService.revertToFileId(versionId, req.user.userId);
+        const version = await versionHistoryService.revertToVersion(versionId, req.user.userId);
 
         res.json({
             success: true,

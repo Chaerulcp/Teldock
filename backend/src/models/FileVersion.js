@@ -1,7 +1,11 @@
 const { DataTypes } = require('sequelize');
-const crypto = require('crypto');
 const { sequelize } = require('../config/database');
 
+/**
+ * FileVersion — an immutable snapshot of a file's state at a point in time.
+ * Stores the full Telegram part references (as JSON) so chunked/encrypted
+ * files can be restored exactly.
+ */
 const FileVersion = sequelize.define('FileVersion', {
     id: {
         type: DataTypes.UUID,
@@ -11,30 +15,55 @@ const FileVersion = sequelize.define('FileVersion', {
     fileId: {
         type: DataTypes.UUID,
         allowNull: false,
-        references: {
-            model: 'files',
-            key: 'id'
-        },
+        references: { model: 'files', key: 'id' },
         onDelete: 'CASCADE'
-    },
-    telegramMessageId: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        comment: 'Telegram message ID where this version is stored'
     },
     userId: {
         type: DataTypes.UUID,
         allowNull: false,
-        references: {
-            model: 'users',
-            key: 'id'
-        },
+        references: { model: 'users', key: 'id' },
         onDelete: 'CASCADE'
     },
     versionNumber: {
         type: DataTypes.INTEGER,
         allowNull: false,
         comment: 'Sequential version number (1, 2, 3...)'
+    },
+    // Single-message reference (legacy / non-chunked convenience)
+    telegramMessageId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: 'Telegram message ID for single-part versions'
+    },
+    telegramFileId: {
+        type: DataTypes.STRING(255),
+        allowNull: true
+    },
+    telegramChatId: {
+        type: DataTypes.BIGINT,
+        allowNull: true
+    },
+    // Chunk / encryption metadata snapshot
+    isChunked: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    partCount: {
+        type: DataTypes.INTEGER,
+        defaultValue: 1
+    },
+    isEncrypted: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    encryptionSalt: {
+        type: DataTypes.STRING(64),
+        allowNull: true
+    },
+    partsSnapshot: {
+        type: DataTypes.TEXT('long'),
+        allowNull: true,
+        comment: 'JSON array of FilePart records for this version'
     },
     originalFilename: {
         type: DataTypes.STRING(500),
@@ -55,7 +84,7 @@ const FileVersion = sequelize.define('FileVersion', {
     },
     checksum: {
         type: DataTypes.STRING(64),
-        comment: 'MD5 or SHA256 hash for integrity verification'
+        comment: 'SHA-256 hash of the original file'
     }
 }, {
     timestamps: true,
@@ -67,41 +96,18 @@ const FileVersion = sequelize.define('FileVersion', {
     ]
 });
 
-// Instance methods
-FileVersion.prototype.getMetadata = function() {
+FileVersion.prototype.getMetadata = function () {
     return {
         id: this.id,
         versionNumber: this.versionNumber,
         filename: this.displayFilename,
         mimeType: this.mimeType,
         fileSize: this.fileSize,
+        isChunked: this.isChunked,
+        partCount: this.partCount,
+        isEncrypted: this.isEncrypted,
         createdAt: this.createdAt
     };
-};
-
-FileVersion.prototype.revertToFile = async function() {
-    // Get the current file
-    const fileModel = require('./File');
-    const currentFile = await fileModel.findByPk(this.fileId);
-    
-    if (!currentFile) {
-        throw new Error('Original file not found');
-    }
-
-    // Update current file with version's data
-    currentFile.displayFilename = this.displayFilename;
-    currentFile.originalFilename = this.originalFilename;
-    currentFile.mimeType = this.mimeType;
-    currentFile.fileSize = this.fileSize;
-    
-    // Update Telegram metadata reference
-    currentFile.telegramMessageId = this.telegramMessageId;
-    
-    await currentFile.save();
-    
-    console.log(`✅ Reverted file ${this.fileId} to version ${this.versionNumber}`);
-    
-    return currentFile;
 };
 
 module.exports = FileVersion;
