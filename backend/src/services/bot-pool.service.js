@@ -1,14 +1,16 @@
 const { BotToken, encrypt } = require('../models/BotToken');
+const { TelegramConfig } = require('../models/TelegramConfig');
 
 /**
  * Bot Pool Service
  *
- * Manages a pool of Telegram bot tokens per user and hands them out in a
- * round-robin fashion so that concurrent upload/download operations can be
- * spread across multiple bots for higher throughput (teldrive-style).
+ * Resolves the Telegram bot tokens to use for a given user, in priority order:
+ *   1. The user's bot pool (BotToken) — for parallel throughput
+ *   2. The bot token from the user's connected TelegramConfig
+ *   3. (dev/testing only) the global TELEGRAM_BOT_TOKEN from the environment
  *
- * Falls back to the global TELEGRAM_BOT_TOKEN / TELEGRAM_STORAGE_CHAT_ID when
- * the user has not configured any bots of their own.
+ * Teldock is multi-user: in production every user must connect their own bot;
+ * the environment token is a convenience for local development only.
  */
 class BotPoolService {
     constructor() {
@@ -78,8 +80,10 @@ class BotPoolService {
     }
 
     /**
-     * Return all usable tokens for a user. If the user has no active bots,
-     * fall back to the global token from the environment.
+     * Return all usable tokens for a user, in priority order:
+     *   1. the user's active bot pool
+     *   2. the user's connected TelegramConfig bot token
+     *   3. (development only) the global env token
      */
     async getTokens(userId) {
         const bots = await BotToken.findAll({
@@ -91,12 +95,22 @@ class BotPoolService {
             return bots.map((b) => b.getToken());
         }
 
-        const fallback = process.env.TELEGRAM_BOT_TOKEN;
-        if (fallback && fallback !== 'your-telegram-bot-token-here') {
-            return [fallback];
+        // Fall back to the token from the user's connected Telegram config
+        const config = await TelegramConfig.findByUser(userId);
+        if (config) {
+            const token = await config.decryptToken();
+            if (token) return [token];
         }
 
-        throw new Error('No Telegram bot configured. Add a bot in Settings.');
+        // Development/testing convenience only — never in production
+        if (process.env.NODE_ENV !== 'production') {
+            const fallback = process.env.TELEGRAM_BOT_TOKEN;
+            if (fallback && fallback !== 'your-telegram-bot-token-here') {
+                return [fallback];
+            }
+        }
+
+        throw new Error('No Telegram bot connected. Add one in Settings → Telegram Integration.');
     }
 
     /**

@@ -1,3 +1,8 @@
+/**
+ * @deprecated Not used. Upload/download now go through telegram-storage.service.js
+ * (chunked, multi-bot, encryption-aware) with credentials resolved by
+ * bot-pool.service.js. Kept only for reference; do not wire into new code.
+ */
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');

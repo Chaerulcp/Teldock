@@ -23,18 +23,21 @@ class TelegramStorageService {
     }
 
     /**
-     * Resolve the storage chat id for a user (per-user config or global env).
+     * Resolve the storage chat id for a user. Uses the user's connected
+     * TelegramConfig; falls back to the env value only in development/testing.
      */
     async getStorageChatId(userId) {
         const config = await TelegramConfig.findByUser(userId);
         if (config && config.storageChatId) {
             return config.storageChatId;
         }
-        const fallback = process.env.TELEGRAM_STORAGE_CHAT_ID;
-        if (fallback && fallback !== '-1001234567890') {
-            return fallback;
+        if (process.env.NODE_ENV !== 'production') {
+            const fallback = process.env.TELEGRAM_STORAGE_CHAT_ID;
+            if (fallback && fallback !== '-1001234567890') {
+                return fallback;
+            }
         }
-        throw new Error('No storage chat configured. Set one in Settings.');
+        throw new Error('No Telegram storage channel connected. Set one in Settings → Telegram Integration.');
     }
 
     sanitizeFilename(filename) {
