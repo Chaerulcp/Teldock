@@ -28,6 +28,10 @@ tmp/
 temp/
 *.tmp
 
+# Test output artifacts
+**/test-results.txt
+**/test-database-results.txt
+
 # Editor / OS
 .vscode/*
 !.vscode/extensions.json
