@@ -32,6 +32,16 @@ temp/
 **/test-results.txt
 **/test-database-results.txt
 
+# AI-generated reports / working docs (not part of the product repo)
+AGENTS.md
+AUDIT_REPORT.md
+COMPLETION_REPORT.md
+FRONTEND_FIX_SUMMARY.md
+PROJECT_SUMMARY.md
+PROJECT_TREE.md
+PLANS/
+docs/
+
 # Editor / OS
 .vscode/*
 !.vscode/extensions.json
