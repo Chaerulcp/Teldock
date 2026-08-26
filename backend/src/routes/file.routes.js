@@ -5,11 +5,11 @@ const { authenticateToken } = require('../middleware/auth.middleware');
 const { createUploadMiddleware, validateFile } = require('../middleware/file-upload.middleware');
 const telegramFileService = require('../services/telegram.service');
 
-// Configure multer for uploads
+// Configure multer for uploads (chunked storage splits large files internally)
 const upload = createUploadMiddleware({
-    maxFileSize: 50 * 1024 * 1024, // 50MB (Telegram cloud API limit)
+    maxFileSize: parseInt(process.env.MAX_UPLOAD_BYTES, 10) || 2 * 1024 * 1024 * 1024, // 2GB default
     allowedTypes: 'all',
-    storageType: 'memory' // Stream directly to Telegram
+    storageType: 'memory' // Buffer in memory, then split into parts
 });
 
 // Protected routes

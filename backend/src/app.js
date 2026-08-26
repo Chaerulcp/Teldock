@@ -10,6 +10,8 @@ const routes = require('./routes/index');
 const userRoutes = require('./routes/user.routes'); // New
 const folderRoutes = require('./routes/folder.routes'); // New
 const previewRoutes = require('./routes/preview.routes'); // New
+const botRoutes = require('./routes/bot.routes'); // Multi-bot pool
+const webdavRouter = require('./routes/webdav.routes'); // Rclone/WebDAV
 const { testConnection } = require('./config/database');
 const RealTimeSyncService = require('./services/realtime-sync.service');
 
@@ -60,11 +62,15 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 app.use('/api/', generalLimiter);
 
+// WebDAV endpoint (Rclone-compatible) - mounted before JSON rate limiter noise
+app.use('/webdav', webdavRouter);
+
 // API routes
 app.use('/api', routes);
 app.use('/api/user', userRoutes); // Add user-specific routes
 app.use('/api/folders', folderRoutes); // Add folder routes
 app.use('/api/previews', previewRoutes); // Add preview routes
+app.use('/api/bots', botRoutes); // Multi-bot token pool
 
 // Error handling middleware
 app.use((err, req, res, next) => {

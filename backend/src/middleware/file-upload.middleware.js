@@ -148,11 +148,13 @@ async function validateFile(req, res, next) {
             });
         }
 
-        // Check file size
-        if (req.file.size > 50 * 1024 * 1024) { // Telegram cloud API limit
+        // Enforce a generous hard cap (chunked upload splits into <18MB parts).
+        // Default 2GB; override with MAX_UPLOAD_BYTES env.
+        const maxBytes = parseInt(process.env.MAX_UPLOAD_BYTES, 10) || 2 * 1024 * 1024 * 1024;
+        if (req.file.size > maxBytes) {
             return res.status(413).json({
                 success: false,
-                error: 'File too large. Maximum size is 50MB for cloud storage.'
+                error: `File too large. Maximum size is ${formatFileSize(maxBytes)}.`
             });
         }
 

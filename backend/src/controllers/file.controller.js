@@ -1,12 +1,8 @@
-const realtimeSync = require('../services/realtime-sync.service');
 const { authenticateToken } = require('../middleware/auth.middleware');
-const { validateFile, sanitizeFilename, formatFileSize } = require('../middleware/file-upload.middleware');
-const telegramFileService = require('../services/telegram.service');
+const { sanitizeFilename } = require('../middleware/file-upload.middleware');
+const telegramStorage = require('../services/telegram-storage.service');
 const versionHistoryService = require('../services/version-history.service');
-const File = require('../models/File');
-const Folder = require('../models/Folder');
-const SharedLink = require('../models/SharedLink');
-const User = require('../models/User');
+const { File, Folder, SharedLink, User, FilePart } = require('../models');
 const { sequelize } = require('../config/database');
 
 /**
@@ -14,16 +10,25 @@ const { sequelize } = require('../config/database');
  * Upload a file to Telegram storage
  */
 async function uploadFile(req, res) {
+    const t = await sequelize.transaction();
     try {
         const user = req.user;
         const file = req.file;
         const folderId = req.body.folderId || null;
+        const encrypt = req.body.encrypt === 'true' || req.body.encrypt === true;
 
         console.log(`📤 Starting upload for ${file.originalname} (${file.size} bytes)`);
 
         // Check storage quota
-        const remainingStorage = user.storageQuotaBytes - user.storageUsedBytes;
+        const dbUser = await User.findByPk(user.userId, { transaction: t });
+        if (!dbUser) {
+            await t.rollback();
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+
+        const remainingStorage = Number(dbUser.storageQuotaBytes) - Number(dbUser.storageUsedBytes);
         if (file.size > remainingStorage) {
+            await t.rollback();
             return res.status(403).json({
                 success: false,
                 error: 'Insufficient storage quota. Please upgrade or delete some files.'
@@ -31,79 +36,80 @@ async function uploadFile(req, res) {
         }
 
         // Find target folder
-        let folder = null;
         if (folderId) {
-            folder = await Folder.findOne({
-                where: { id: folderId, userId: user.id },
-                include: [{ model: User, as: 'user', where: { id: user.id } }]
+            const folder = await Folder.findOne({
+                where: { id: folderId, userId: user.userId },
+                transaction: t
             });
-
             if (!folder) {
-                return res.status(404).json({
-                    success: false,
-                    error: 'Folder not found'
-                });
+                await t.rollback();
+                return res.status(404).json({ success: false, error: 'Folder not found' });
             }
         }
 
-        // Stream file to Telegram
-        const inputStream = file.stream();
-        const telegramResult = await telegramFileService.uploadToStorage(inputStream, file.originalname, {
-            mimeType: file.mimetype,
-            description: req.body.description || '',
-            tags: req.body.tags || [],
-            folderId,
-            telegramTopicId: folder?.telegramTopicId || null
+        // Upload to Telegram (chunked + optional encryption via multi-bot pool)
+        const buffer = file.buffer;
+        const result = await telegramStorage.uploadFile(user.userId, buffer, file.originalname, {
+            encrypt
         });
 
-        if (!telegramResult.success) {
-            throw new Error('Failed to upload to Telegram storage');
-        }
-
-        // Create file record in database
+        // Create file record
         const uploadedFile = await File.create({
-            userId: user.id,
+            userId: user.userId,
             folderId: folderId || null,
-            telegramChatId: process.env.TELEGRAM_STORAGE_CHAT_ID,
-            telegramMessageId: telegramResult.message_id,
-            telegramFileId: telegramResult.file_id,
+            telegramChatId: result.telegramChatId,
+            telegramMessageId: result.telegramMessageId,
+            telegramFileId: result.telegramFileId,
             originalFilename: file.originalname,
             displayFilename: sanitizeFilename(file.originalname),
             mimeType: file.mimetype,
-            fileSize: telegramResult.file_size || file.size
-        });
+            fileSize: file.size,
+            isChunked: result.isChunked,
+            partCount: result.partCount,
+            isEncrypted: result.isEncrypted,
+            encryptionSalt: result.encryptionSalt,
+            checksum: result.checksum
+        }, { transaction: t });
+
+        // Persist part records
+        for (const part of result.parts) {
+            await FilePart.create({
+                fileId: uploadedFile.id,
+                partIndex: part.partIndex,
+                telegramChatId: part.telegramChatId,
+                telegramMessageId: part.telegramMessageId,
+                telegramFileId: part.telegramFileId,
+                partSize: part.partSize,
+                plainSize: part.plainSize,
+                encryptionIv: part.encryptionIv,
+                checksum: part.checksum
+            }, { transaction: t });
+        }
 
         // Update user storage usage
         await User.update(
-            { storageUsedBytes: sequelize.literal(`storage_used_bytes + ${uploadedFile.fileSize}`) },
-            { where: { id: user.id } }
+            { storageUsedBytes: sequelize.literal(`storage_used_bytes + ${Number(file.size)}`) },
+            { where: { id: user.userId }, transaction: t }
         );
 
-        console.log(`✅ Upload complete: ${uploadedFile.displayFilename}`);
+        await t.commit();
+
+        console.log(`✅ Upload complete: ${uploadedFile.displayFilename} (${result.partCount} part(s), encrypted=${result.isEncrypted})`);
 
         res.status(201).json({
             success: true,
             message: 'File uploaded successfully',
-            data: {
-                file: uploadedFile
-            }
+            data: { file: uploadedFile }
         });
 
     } catch (error) {
+        await t.rollback().catch(() => {});
         console.error('❌ Upload failed:', error.message);
-        
-        // Log specific errors
+
         if (error.name === 'SequelizeValidationError') {
             return res.status(400).json({
                 success: false,
                 error: 'Validation failed: ' + error.message
-            });
-        }
-
-        if (error.response && error.response.data && error.response.data.error) {
-            return res.status(500).json({
-                success: false,
-                error: error.response.data.error
             });
         }
 
@@ -122,57 +128,100 @@ async function downloadFile(req, res) {
     try {
         const { id } = req.params;
 
-        // Get file details
         const file = await File.findOne({
             where: { id: id, isDeleted: false },
-            include: [{ model: User, as: 'user' }]
+            include: [{ model: FilePart, as: 'parts' }]
         });
 
         if (!file) {
-            return res.status(404).json({
-                success: false,
-                error: 'File not found'
-            });
+            return res.status(404).json({ success: false, error: 'File not found' });
         }
 
         // Verify ownership or public access
         if (file.isPublic && file.sharedToken) {
-            // Allow public access if token matches
             const providedToken = req.query.token;
             if (!providedToken || providedToken !== file.sharedToken) {
-                return res.status(403).json({
-                    success: false,
-                    error: 'Access denied'
-                });
+                return res.status(403).json({ success: false, error: 'Access denied' });
             }
         } else if (file.userId !== req.user.userId) {
-            return res.status(403).json({
-                success: false,
-                error: 'Access denied'
-            });
+            return res.status(403).json({ success: false, error: 'Access denied' });
         }
 
-        // Increment download count
         await file.incrementDownload();
 
-        // Download from Telegram
-        const downloadResult = await telegramFileService.downloadFromTelegram(file.telegramFileId);
+        const parts = file.parts && file.parts.length > 0
+            ? file.parts
+            : [{
+                partIndex: 0,
+                telegramChatId: file.telegramChatId,
+                telegramMessageId: file.telegramMessageId,
+                telegramFileId: file.telegramFileId,
+                partSize: file.fileSize,
+                plainSize: file.fileSize,
+                encryptionIv: null
+            }];
 
-        // Set headers for streaming
-        res.setHeader('Content-Disposition', `attachment; filename="${file.displayFilename}"`);
+        const totalSize = Number(file.fileSize);
+
+        // Parse HTTP Range header for seek support
+        const rangeHeader = req.headers.range;
+        let start = 0;
+        let end = totalSize - 1;
+        let isPartial = false;
+
+        if (rangeHeader) {
+            const match = /bytes=(\d*)-(\d*)/.exec(rangeHeader);
+            if (match) {
+                if (match[1]) start = parseInt(match[1], 10);
+                if (match[2]) end = parseInt(match[2], 10);
+                if (isNaN(start)) start = 0;
+                if (isNaN(end) || end >= totalSize) end = totalSize - 1;
+                if (start > end || start >= totalSize) {
+                    res.status(416).setHeader('Content-Range', `bytes */${totalSize}`);
+                    return res.end();
+                }
+                isPartial = true;
+            }
+        }
+
+        const contentLength = end - start + 1;
+        const encodedName = encodeURIComponent(file.displayFilename);
+
         res.setHeader('Content-Type', file.mimeType);
-        res.setHeader('Content-Length', file.fileSize);
-        res.setHeader('X-File-Id', file.id);
+        res.setHeader('Accept-Ranges', 'bytes');
+        res.setHeader('Content-Length', contentLength);
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="${file.displayFilename}"; filename*=UTF-8''${encodedName}`
+        );
 
-        // Redirect to Telegram CDN URL for direct download
-        res.redirect(downloadResult.downloadUrl);
+        if (isPartial) {
+            res.status(206).setHeader('Content-Range', `bytes ${start}-${end}/${totalSize}`);
+        }
+
+        const { stream } = telegramStorage.createReadStream(
+            file.userId,
+            parts,
+            file.encryptionSalt,
+            { start, end }
+        );
+
+        stream.on('error', (err) => {
+            console.error('❌ Download stream error:', err.message);
+            if (!res.headersSent) {
+                res.status(500).json({ success: false, error: 'Download failed' });
+            } else {
+                res.destroy(err);
+            }
+        });
+
+        stream.pipe(res);
 
     } catch (error) {
         console.error('❌ Download failed:', error.message);
-        res.status(500).json({
-            success: false,
-            error: 'Download failed: ' + error.message
-        });
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, error: 'Download failed: ' + error.message });
+        }
     }
 }
 
@@ -277,7 +326,8 @@ async function deleteFile(req, res) {
 
         // Find file
         const file = await File.findOne({
-            where: { id: id, userId: req.user.userId, isDeleted: false }
+            where: { id: id, userId: req.user.userId, isDeleted: false },
+            include: [{ model: FilePart, as: 'parts' }]
         });
 
         if (!file) {
@@ -290,10 +340,14 @@ async function deleteFile(req, res) {
         // Delete from Telegram if requested
         if (deleteFromTelegram) {
             try {
-                await telegramFileService.deleteFromStorage(
-                    file.telegramChatId,
-                    file.telegramMessageId
-                );
+                const parts = file.parts && file.parts.length > 0
+                    ? file.parts
+                    : [{
+                        partIndex: 0,
+                        telegramChatId: file.telegramChatId,
+                        telegramMessageId: file.telegramMessageId
+                    }];
+                await telegramStorage.deleteFile(req.user.userId, parts);
             } catch (error) {
                 console.warn('Warning: Failed to delete from Telegram, but file marked as deleted locally');
             }
