@@ -97,6 +97,11 @@ const File = sequelize.define('File', {
         defaultValue: false,
         comment: 'Publicly accessible or private only'
     },
+    isFavorite: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        comment: 'Whether the owner starred this file'
+    },
     sharedToken: {
         type: DataTypes.STRING(64),
         allowNull: true,
@@ -214,35 +219,51 @@ File.getUserFiles = async function(userId, options = {}) {
         limit = 50,
         sortBy = 'createdAt',
         sortOrder = 'DESC',
-        includeDeleted = false
+        includeDeleted = false,
+        favorite = false,
+        tagId = null
     } = options;
-    
+
     const where = {
         userId: userId,
         isDeleted: includeDeleted ? null : false
     };
-    
+
     if (folderId) {
         where.folderId = folderId;
     }
-    
+    if (favorite) {
+        where.isFavorite = true;
+    }
+
     const offset = (page - 1) * limit;
     const Folder = require('./Folder');
+    const Tag = require('./Tag');
+
+    const include = [{
+        model: Folder,
+        as: 'folder',
+        attributes: ['id', 'name']
+    }, {
+        model: Tag,
+        as: 'tags',
+        attributes: ['id', 'name', 'color'],
+        through: { attributes: [] },
+        ...(tagId ? { where: { id: tagId } } : {})
+    }];
+
     const result = await File.findAndCountAll({
         where: where,
         order: [[sortBy, sortOrder]],
         limit: limit,
         offset: offset,
-        include: [{
-            model: Folder,
-            as: 'folder',
-            attributes: ['id', 'name']
-        }],
+        include,
+        distinct: true,
         attributes: {
             exclude: ['telegramFileId'] // Don't expose internal ID publicly
         }
     });
-    
+
     return {
         files: result.rows,
         total: result.count,

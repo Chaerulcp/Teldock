@@ -2,7 +2,7 @@ const { authenticateToken } = require('../middleware/auth.middleware');
 const { sanitizeFilename } = require('../middleware/file-upload.middleware');
 const telegramStorage = require('../services/telegram-storage.service');
 const versionHistoryService = require('../services/version-history.service');
-const { File, Folder, SharedLink, User, FilePart } = require('../models');
+const { File, Folder, SharedLink, User, FilePart, Tag } = require('../models');
 const { sequelize } = require('../config/database');
 
 /**
@@ -316,7 +316,9 @@ async function listFiles(req, res) {
             limit = 50,
             sortBy = 'createdAt',
             sortOrder = 'DESC',
-            includeDeleted = false
+            includeDeleted = false,
+            favorite = false,
+            tagId = null
         } = req.query;
 
         const result = await File.getUserFiles(req.user.userId, {
@@ -325,7 +327,9 @@ async function listFiles(req, res) {
             limit: parseInt(limit),
             sortBy,
             sortOrder,
-            includeDeleted: includeDeleted === 'true'
+            includeDeleted: includeDeleted === 'true',
+            favorite: favorite === 'true' || favorite === true,
+            tagId: tagId || null
         });
 
         res.json({
@@ -585,7 +589,7 @@ async function revertVersion(req, res) {
 async function updateFile(req, res) {
     try {
         const { id } = req.params;
-        const { displayFilename, folderId } = req.body;
+        const { displayFilename, folderId, isFavorite } = req.body;
 
         const file = await File.findOne({
             where: { id, userId: req.user.userId, isDeleted: false }
@@ -616,12 +620,52 @@ async function updateFile(req, res) {
             file.displayFilename = clean;
         }
 
+        // Favorite toggle
+        if (isFavorite !== undefined) {
+            file.isFavorite = isFavorite === true || isFavorite === 'true';
+        }
+
         await file.save();
 
         res.json({ success: true, message: 'File updated', data: { file } });
     } catch (error) {
         console.error('❌ Update file failed:', error.message);
         res.status(500).json({ success: false, error: 'Failed to update file' });
+    }
+}
+
+/**
+ * PUT /api/files/:id/tags
+ * Replace the set of tags on a file: { tagIds: [] }
+ */
+async function setFileTags(req, res) {
+    try {
+        const { id } = req.params;
+        const { tagIds } = req.body;
+
+        const file = await File.findOne({
+            where: { id, userId: req.user.userId, isDeleted: false }
+        });
+        if (!file) {
+            return res.status(404).json({ success: false, error: 'File not found' });
+        }
+
+        const ids = Array.isArray(tagIds) ? tagIds : [];
+        // Only allow tags owned by this user
+        const tags = ids.length
+            ? await Tag.findAll({ where: { id: ids, userId: req.user.userId } })
+            : [];
+
+        await file.setTags(tags);
+
+        const refreshed = await File.findByPk(id, {
+            include: [{ model: Tag, as: 'tags', attributes: ['id', 'name', 'color'], through: { attributes: [] } }]
+        });
+
+        res.json({ success: true, message: 'Tags updated', data: { tags: refreshed.tags } });
+    } catch (error) {
+        console.error('❌ Set file tags failed:', error.message);
+        res.status(500).json({ success: false, error: 'Failed to update tags' });
     }
 }
 
@@ -717,6 +761,7 @@ module.exports = {
     listVersions,
     revertVersion,
     updateFile,
+    setFileTags,
     bulkAction,
     shareFile,
     deleteFile,

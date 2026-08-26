@@ -7,6 +7,9 @@ const TelegramConfig = require('./TelegramConfig');
 const FileVersion = require('./FileVersion');
 const FilePart = require('./FilePart');
 const { BotToken } = require('./BotToken');
+const Tag = require('./Tag');
+const FileTag = require('./FileTag');
+const SmartFolder = require('./SmartFolder');
 
 // Set up associations
 User.hasMany(FileVersion, { foreignKey: 'userId', as: 'fileVersions' });
@@ -39,6 +42,17 @@ FilePart.belongsTo(File, { foreignKey: 'fileId', as: 'file' });
 User.hasMany(BotToken, { foreignKey: 'userId', as: 'botTokens' });
 BotToken.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
+// Tags (many-to-many with File via FileTag)
+User.hasMany(Tag, { foreignKey: 'userId', as: 'tags' });
+Tag.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+File.belongsToMany(Tag, { through: FileTag, foreignKey: 'fileId', otherKey: 'tagId', as: 'tags' });
+Tag.belongsToMany(File, { through: FileTag, foreignKey: 'tagId', otherKey: 'fileId', as: 'files' });
+
+// Smart folders (saved filters)
+User.hasMany(SmartFolder, { foreignKey: 'userId', as: 'smartFolders' });
+SmartFolder.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
 module.exports = {
     sequelize,
     User,
@@ -48,5 +62,8 @@ module.exports = {
     TelegramConfig,
     FileVersion,
     FilePart,
-    BotToken
+    BotToken,
+    Tag,
+    FileTag,
+    SmartFolder
 };

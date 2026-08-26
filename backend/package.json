@@ -11,6 +11,7 @@
     "migrate:drop-quota": "node scripts/migrate-drop-quota.js",
     "migrate:widen-share-token": "node scripts/migrate-widen-share-token.js",
     "migrate:version-snapshots": "node scripts/migrate-version-snapshots.js",
+    "migrate:tags-favorites": "node scripts/migrate-tags-favorites.js",
     "test-auth": "node tests/test-auth.js",
     "test-db": "node scripts/test-database.js",
     "generate-previews": "node scripts/generate-previews.js",
