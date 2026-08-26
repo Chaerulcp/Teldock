@@ -227,6 +227,7 @@ File.getUserFiles = async function(userId, options = {}) {
     }
     
     const offset = (page - 1) * limit;
+    const Folder = require('./Folder');
     const result = await File.findAndCountAll({
         where: where,
         order: [[sortBy, sortOrder]],
