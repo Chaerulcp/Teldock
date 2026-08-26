@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import {
   Cloud, ArrowRight, ShieldCheck, Layers, FolderTree,
-  Share2, Gauge, Lock, Github, Terminal, Server, Check, AlertTriangle, Code2, GitFork, Star, BookOpen
+  Share2, Gauge, Lock, Github, Terminal, Server, Check, AlertTriangle, Code2, GitFork, Star, BookOpen, Users
 } from 'lucide-react';
 import { useThemeStore } from '../store/theme-store';
 import { Moon, Sun } from 'lucide-react';
@@ -80,8 +80,9 @@ function Landing() {
               <span className="text-primary-600 dark:text-primary-400">Telegram</span> Bot API.
             </h1>
             <p className="mt-6 text-lg text-ink-600 dark:text-ink-300 leading-relaxed max-w-[52ch]">
-              Teldock is a free, open-source experiment that turns a Telegram channel into a personal
-              cloud drive. Run it yourself, connect your own bot, own all your data.
+              Teldock is a free, open-source experiment that turns Telegram into a personal
+              cloud drive. Self-host it once, and every account connects its own bot and channel —
+              so a whole household can share one instance while keeping files separate.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <a
@@ -181,6 +182,7 @@ function Landing() {
             { icon: Lock, title: 'AES-256 encryption', body: 'Opt-in per-file encryption with a random salt and per-part IV. Keys stay on your instance.' },
             { icon: FolderTree, title: 'Real folders', body: 'Nested folders, move, rename, and organize like a native file manager.' },
             { icon: Share2, title: 'Signed sharing', body: 'Generate expiring, password-protected links with download limits.' },
+            { icon: Users, title: 'Multi-account', body: 'One instance, many users — each connects their own bot and channel, fully isolated.' },
             { icon: Server, title: 'WebDAV + Rclone', body: 'Mount your instance as a remote and sync with the tools you already use.' },
           ].map((f) => (
             <div
@@ -208,8 +210,8 @@ function Landing() {
               Clone, configure, run
             </h2>
             <p className="mt-4 text-lg text-ink-600 dark:text-ink-300 leading-relaxed max-w-[52ch]">
-              Teldock is self-hosted. There is no hosted service — you run it on your own machine or VPS,
-              point it at your own Telegram bot, and keep full control of your data.
+              Teldock is self-hosted. There is no hosted service — you run it on your own machine or VPS.
+              Then each user signs in and connects their own Telegram bot and channel from Settings.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-700 dark:text-ink-200 border border-ink-200 dark:border-ink-800 px-4 py-2.5 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800 transition-colors">
@@ -233,7 +235,7 @@ function Landing() {
 <span className="text-ink-500"># clone & install</span>{'\n'}
 <span className="text-primary-400">git</span> clone {REPO_URL}.git{'\n'}
 <span className="text-primary-400">cd</span> Teldock/backend && <span className="text-primary-400">npm</span> install{'\n'}
-<span className="text-primary-400">cp</span> .env.example .env   <span className="text-ink-500"># add your bot token</span>{'\n'}
+<span className="text-primary-400">cp</span> .env.example .env   <span className="text-ink-500"># configure DB + secrets</span>{'\n'}
 <span className="text-primary-400">npm</span> run migrate{'\n'}
 <span className="text-primary-400">npm</span> run dev{'\n'}
 {'\n'}
@@ -252,9 +254,9 @@ function Landing() {
         </div>
         <div className="mt-14 grid md:grid-cols-3 gap-8">
           {[
-            { n: '01', title: 'Connect a bot', body: 'Create a bot with @BotFather and point it at a private channel you control.' },
-            { n: '02', title: 'Upload anything', body: 'Files are chunked, optionally encrypted, and streamed to your Telegram channel.' },
-            { n: '03', title: 'Access anywhere', body: 'Browse, stream, share, or mount via WebDAV from your own instance.' },
+            { n: '01', title: 'Self-host it', body: 'Clone the repo and run Teldock on your machine or VPS — one instance for your whole household.' },
+            { n: '02', title: 'Each user connects a bot', body: 'Every account adds its own @BotFather bot and private channel in Settings. Files stay isolated per user.' },
+            { n: '03', title: 'Upload & access anywhere', body: 'Files are chunked, optionally encrypted, streamed to each user\u2019s own channel — browse, share, or mount via WebDAV.' },
           ].map((s) => (
             <div key={s.n} className="relative">
               <span className="font-mono text-sm font-semibold text-primary-500">{s.n}</span>
@@ -278,7 +280,7 @@ function Landing() {
                 No middleman. You self-host everything.
               </h2>
               <p className="mt-4 text-ink-300 leading-relaxed max-w-[52ch]">
-                There are no Teldock servers. Files move directly between your instance and your own
+                There are no Teldock servers. Files move directly between your instance and each user's own
                 Telegram bot. Credentials are encrypted at rest and encryption keys never leave your deployment.
               </p>
             </div>

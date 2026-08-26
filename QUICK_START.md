@@ -6,7 +6,7 @@ Get the app running locally in a few minutes.
 
 - Node.js 20+ (22.x recommended)
 - MySQL / MariaDB running
-- (Optional) A Telegram bot token from [@BotFather](https://t.me/BotFather) and a storage chat/channel ID for real uploads
+- Each user account needs its own Telegram bot ([@BotFather](https://t.me/BotFather)) + a private storage channel, connected **in the app** (not in `.env`). The `.env` Telegram values are for local dev/testing only.
 
 ---
 
@@ -38,8 +38,13 @@ Vite proxies `/api` to the backend automatically.
 
 1. Open http://localhost:3000
 2. Register a new account.
-3. Go to **Settings → Telegram Integration** and connect your bot token + storage chat ID.
+3. Go to **Settings → Telegram Integration** and connect **your own** bot token + storage channel ID
+   (create a bot with @BotFather, make a private channel, add the bot as an admin).
 4. Upload, download, share, and organize files.
+
+> Teldock is **multi-user**: each account connects its own bot + channel and stores files in its own
+> Telegram channel. Several people (e.g. a family) can share one self-hosted instance while staying isolated.
+> See "How Telegram credentials work" in the [README](README.md#how-telegram-credentials-work).
 
 ---
 
@@ -84,7 +89,7 @@ Expected:
 
 - **Can't reach the frontend** — ensure `npm run dev` is running in `frontend/`.
 - **Auth failing** — confirm the backend is on port 3001; the client refreshes tokens automatically.
-- **Uploads failing** — connect a valid Telegram bot in Settings; the bot must be an admin of the storage channel.
+- **Uploads failing** — connect your own bot in Settings; the bot must be an admin of your storage channel (with Post + Delete Messages).
 - **Database errors** — start MySQL, verify `.env` credentials, then re-run `npm run migrate`.
 
 For full documentation, see [README.md](README.md).

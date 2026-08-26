@@ -18,6 +18,7 @@
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
+- [How Telegram credentials work](#how-telegram-credentials-work)
 - [Environment Variables](#environment-variables)
 - [Available Scripts](#available-scripts)
 - [API Reference](#api-reference)
@@ -39,13 +40,14 @@
 
 **How it works:**
 
-1. A file is uploaded through the web interface.
-2. The backend splits the file into parts (~18 MB each) and streams each part to a Telegram chat/channel via the Bot API (`sendDocument`), spreading parts across the user's bot pool.
-3. Telegram returns metadata (`file_id`, `message_id`) for every part.
-4. The database stores only that metadata plus ownership, ordering, and (optional) encryption info — never the raw file.
-5. On download, the backend resolves each part's Telegram `file_path`, fetches and (if needed) decrypts the parts, and streams them back in order — honoring HTTP `Range` requests for seeking/resuming.
+1. Each user connects **their own Telegram bot and storage channel** in Settings (see [How Telegram credentials work](#how-telegram-credentials-work)).
+2. A file is uploaded through the web interface.
+3. The backend splits the file into parts (~18 MB each) and streams each part to the user's Telegram channel via the Bot API (`sendDocument`), spreading parts across that user's bot pool.
+4. Telegram returns metadata (`file_id`, `message_id`) for every part.
+5. The database stores only that metadata plus ownership, ordering, and (optional) encryption info — never the raw file.
+6. On download, the backend resolves each part's Telegram `file_path`, fetches and (if needed) decrypts the parts, and streams them back in order — honoring HTTP `Range` requests for seeking/resuming.
 
-This design avoids storing large files on the server disk and offloads bandwidth to Telegram's CDN.
+This design avoids storing large files on the server disk and offloads bandwidth to Telegram's CDN. Because every user brings their own bot + channel, one self-hosted instance can serve multiple people (e.g. a family) where **each account stores files in its own Telegram channel**.
 
 ---
 
@@ -82,8 +84,10 @@ This design avoids storing large files on the server disk and offloads bandwidth
 - Public link endpoint that requires no authentication
 
 **Per-user Telegram configuration**
-- Each user can connect their own bot token + storage chat via the Settings page
+- **Every user connects their own bot token + storage channel** via Settings — files are stored in *their* channel, not a shared one
+- Optionally add extra bot tokens to a per-user **bot pool** for faster parallel transfers
 - Credentials are encrypted at rest (AES-256-CBC)
+- One self-hosted instance can serve many accounts (e.g. a household), each fully isolated
 
 **Media previews**
 - On-demand image preview generation (multiple sizes, WebP) using `sharp`
@@ -189,7 +193,7 @@ Teldock/
 - Node.js 20+ (22.x recommended)
 - MySQL or MariaDB (8.0+)
 - Optional: Redis (for the preview queue), `ffmpeg` (for video thumbnails)
-- A Telegram bot token from [@BotFather](https://t.me/BotFather) and a storage chat/channel ID (only needed for real uploads)
+- Each end user needs their own Telegram bot ([@BotFather](https://t.me/BotFather)) + a private storage channel — configured **in the app**, not in `.env` (see [How Telegram credentials work](#how-telegram-credentials-work))
 
 ### 1. Clone
 
@@ -222,7 +226,43 @@ The Vite dev server proxies `/api` requests to the backend at `http://localhost:
 
 ### 4. Open the app
 
-Navigate to **http://localhost:3000**, register an account, then open **Settings** to connect your Telegram bot before uploading files.
+Navigate to **http://localhost:3000**, register an account, then open **Settings → Telegram Integration** to connect your own bot and storage channel before uploading files. Each account connects its own bot/channel — see the next section.
+
+---
+
+## How Telegram credentials work
+
+Teldock is **multi-user**: a single self-hosted instance can serve several accounts (for example, every member of a household), and **each account stores its files in its own Telegram channel using its own bot**. Nothing is shared between accounts.
+
+### What each user provides (in the app, not in `.env`)
+
+In **Settings → Telegram Integration**, every user connects:
+
+1. **A bot token** — created via [@BotFather](https://t.me/BotFather).
+2. **A storage channel ID** — a private channel they own, with their bot added as an **admin** (needs *Post Messages* + *Delete Messages*).
+
+These credentials are **encrypted at rest** (AES-256-CBC) in the database and are never returned to the client or exposed in API responses.
+
+### Optional: bot pool (per user)
+
+In **Settings → Bot Pool**, a user can add several additional bot tokens. Uploads and downloads are then spread round-robin across that user's bots for higher throughput. This pool belongs to that user only.
+
+### Credential resolution order
+
+When a user uploads or downloads, the backend resolves credentials **for that user** in this order:
+
+| What | Source (in priority order) |
+|------|------------------------------|
+| Storage channel | User's connected `TelegramConfig` |
+| Bot token(s) | User's bot pool → user's connected bot token |
+
+> **Environment variables `TELEGRAM_BOT_TOKEN` / `TELEGRAM_STORAGE_CHAT_ID` are for local development/testing only.** In a real multi-user deployment they are **not** used as a shared fallback — each user must connect their own bot and channel. (See the [roadmap note](#environment-variables) about disabling the env fallback outside development.)
+
+### Why per-user (and not one shared bot)?
+
+- **Isolation & privacy** — one member's files never land in another member's channel.
+- **Quota & rate limits** — Telegram limits are per-bot; separate bots avoid one user throttling everyone.
+- **Ownership** — each person controls (and can revoke) their own bot and channel.
 
 ---
 
@@ -241,15 +281,17 @@ Configure these in `backend/.env` (see `backend/.env.example`):
 | `JWT_EXPIRE` | Access token lifetime (e.g. `15m`) |
 | `REFRESH_TOKEN_SECRET` | Secret for refresh tokens |
 | `REFRESH_TOKEN_EXPIRE` | Refresh token lifetime (e.g. `7d`) |
-| `TELEGRAM_BOT_TOKEN` | Global bot token (fallback) |
-| `TELEGRAM_STORAGE_CHAT_ID` | Global storage chat/channel ID |
-| `TELEGRAM_API_URL` | Base Bot API URL, e.g. `https://api.telegram.org/bot<token>` |
-| `ENCRYPTION_KEY` | Key for encrypting per-user Telegram credentials & files |
+| `TELEGRAM_BOT_TOKEN` | **Dev/testing only** — a bot token used when no per-user bot is connected |
+| `TELEGRAM_STORAGE_CHAT_ID` | **Dev/testing only** — a storage channel used during local testing |
+| `TELEGRAM_API_URL` | Base Bot API URL, e.g. `https://api.telegram.org/bot<token>` (dev/testing) |
+| `ENCRYPTION_KEY` | Key for encrypting per-user Telegram credentials & files (**required**) |
 | `TG_PART_SIZE` | Chunk size in bytes for large-file splitting (default 18 MB) |
 | `MAX_UPLOAD_BYTES` | Max accepted upload size (default 2 GB) |
 | `REDIS_HOST` / `REDIS_PORT` | Redis connection (optional, preview queue) |
 | `CORS_ORIGIN` | Allowed frontend origin (default `http://localhost:3000`) |
 | `BCRYPT_ROUNDS` | bcrypt cost factor |
+
+> **`TELEGRAM_BOT_TOKEN` / `TELEGRAM_STORAGE_CHAT_ID` are a convenience for local development only.** Real usage relies on **per-user** credentials connected in Settings (see [How Telegram credentials work](#how-telegram-credentials-work)). Set a strong `ENCRYPTION_KEY` and keep it stable — changing it makes previously encrypted credentials/files unreadable.
 
 > **Never commit `.env`.** It is git-ignored. Bot tokens and chat IDs must never be exposed to the client or returned in public API responses.
 
