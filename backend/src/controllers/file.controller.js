@@ -1,0 +1,460 @@
+const realtimeSync = require('../services/realtime-sync.service');
+const { authenticateToken } = require('../middleware/auth.middleware');
+const { validateFile, sanitizeFilename, formatFileSize } = require('../middleware/file-upload.middleware');
+const telegramFileService = require('../services/telegram.service');
+const versionHistoryService = require('../services/version-history.service');
+const File = require('../models/File');
+const Folder = require('../models/Folder');
+const SharedLink = require('../models/SharedLink');
+const User = require('../models/User');
+const { sequelize } = require('../config/database');
+
+/**
+ * POST /api/files/upload
+ * Upload a file to Telegram storage
+ */
+async function uploadFile(req, res) {
+    try {
+        const user = req.user;
+        const file = req.file;
+        const folderId = req.body.folderId || null;
+
+        console.log(`📤 Starting upload for ${file.originalname} (${file.size} bytes)`);
+
+        // Check storage quota
+        const remainingStorage = user.storageQuotaBytes - user.storageUsedBytes;
+        if (file.size > remainingStorage) {
+            return res.status(403).json({
+                success: false,
+                error: 'Insufficient storage quota. Please upgrade or delete some files.'
+            });
+        }
+
+        // Find target folder
+        let folder = null;
+        if (folderId) {
+            folder = await Folder.findOne({
+                where: { id: folderId, userId: user.id },
+                include: [{ model: User, as: 'user', where: { id: user.id } }]
+            });
+
+            if (!folder) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Folder not found'
+                });
+            }
+        }
+
+        // Stream file to Telegram
+        const inputStream = file.stream();
+        const telegramResult = await telegramFileService.uploadToStorage(inputStream, file.originalname, {
+            mimeType: file.mimetype,
+            description: req.body.description || '',
+            tags: req.body.tags || [],
+            folderId,
+            telegramTopicId: folder?.telegramTopicId || null
+        });
+
+        if (!telegramResult.success) {
+            throw new Error('Failed to upload to Telegram storage');
+        }
+
+        // Create file record in database
+        const uploadedFile = await File.create({
+            userId: user.id,
+            folderId: folderId || null,
+            telegramChatId: process.env.TELEGRAM_STORAGE_CHAT_ID,
+            telegramMessageId: telegramResult.message_id,
+            telegramFileId: telegramResult.file_id,
+            originalFilename: file.originalname,
+            displayFilename: sanitizeFilename(file.originalname),
+            mimeType: file.mimetype,
+            fileSize: telegramResult.file_size || file.size
+        });
+
+        // Update user storage usage
+        await User.update(
+            { storageUsedBytes: sequelize.literal(`storage_used_bytes + ${uploadedFile.fileSize}`) },
+            { where: { id: user.id } }
+        );
+
+        console.log(`✅ Upload complete: ${uploadedFile.displayFilename}`);
+
+        res.status(201).json({
+            success: true,
+            message: 'File uploaded successfully',
+            data: {
+                file: uploadedFile
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Upload failed:', error.message);
+        
+        // Log specific errors
+        if (error.name === 'SequelizeValidationError') {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed: ' + error.message
+            });
+        }
+
+        if (error.response && error.response.data && error.response.data.error) {
+            return res.status(500).json({
+                success: false,
+                error: error.response.data.error
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            error: 'Upload failed: ' + error.message
+        });
+    }
+}
+
+/**
+ * GET /api/files/:id/download
+ * Download a file from Telegram CDN
+ */
+async function downloadFile(req, res) {
+    try {
+        const { id } = req.params;
+
+        // Get file details
+        const file = await File.findOne({
+            where: { id: id, isDeleted: false },
+            include: [{ model: User, as: 'user' }]
+        });
+
+        if (!file) {
+            return res.status(404).json({
+                success: false,
+                error: 'File not found'
+            });
+        }
+
+        // Verify ownership or public access
+        if (file.isPublic && file.sharedToken) {
+            // Allow public access if token matches
+            const providedToken = req.query.token;
+            if (!providedToken || providedToken !== file.sharedToken) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'Access denied'
+                });
+            }
+        } else if (file.userId !== req.user.userId) {
+            return res.status(403).json({
+                success: false,
+                error: 'Access denied'
+            });
+        }
+
+        // Increment download count
+        await file.incrementDownload();
+
+        // Download from Telegram
+        const downloadResult = await telegramFileService.downloadFromTelegram(file.telegramFileId);
+
+        // Set headers for streaming
+        res.setHeader('Content-Disposition', `attachment; filename="${file.displayFilename}"`);
+        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Content-Length', file.fileSize);
+        res.setHeader('X-File-Id', file.id);
+
+        // Redirect to Telegram CDN URL for direct download
+        res.redirect(downloadResult.downloadUrl);
+
+    } catch (error) {
+        console.error('❌ Download failed:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Download failed: ' + error.message
+        });
+    }
+}
+
+/**
+ * GET /api/files
+ * List all files for current user with pagination
+ */
+async function listFiles(req, res) {
+    try {
+        const {
+            folderId,
+            page = 1,
+            limit = 50,
+            sortBy = 'createdAt',
+            sortOrder = 'DESC',
+            includeDeleted = false
+        } = req.query;
+
+        const result = await File.getUserFiles(req.user.userId, {
+            folderId: folderId || null,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            sortBy,
+            sortOrder,
+            includeDeleted: includeDeleted === 'true'
+        });
+
+        res.json({
+            success: true,
+            data: result
+        });
+
+    } catch (error) {
+        console.error('❌ List files failed:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to list files'
+        });
+    }
+}
+
+/**
+ * POST /api/files/:id/share
+ * Create shared link for file
+ */
+async function shareFile(req, res) {
+    try {
+        const { id } = req.params;
+        const { expiresIn, downloadLimit, password } = req.body;
+
+        // Find file
+        const file = await File.findOne({
+            where: { id: id, userId: req.user.userId, isDeleted: false }
+        });
+
+        if (!file) {
+            return res.status(404).json({
+                success: false,
+                error: 'File not found'
+            });
+        }
+
+        // Generate shared link
+        const sharedLink = await SharedLink.createLink(id, req.user.userId, {
+            expiresIn: parseInt(expiresIn) || null,
+            downloadLimit: downloadLimit ? parseInt(downloadLimit) : null,
+            password: password || null,
+            allowPreview: req.body.allowPreview !== false
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Shared link created',
+            data: {
+                link: {
+                    id: sharedLink.id,
+                    shortUrl: `${process.env.FRONTEND_URL || ''}/s/${sharedLink.token}`,
+                    expiresAt: sharedLink.expiresAt,
+                    downloadLimit: sharedLink.downloadLimit,
+                    usedDownloads: sharedLink.usedDownloads
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Share failed:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to create share link'
+        });
+    }
+}
+
+/**
+ * DELETE /api/files/:id
+ * Soft delete a file
+ */
+async function deleteFile(req, res) {
+    try {
+        const { id } = req.params;
+        const deleteFromTelegram = req.query.deleteFromTelegram !== 'false';
+
+        // Find file
+        const file = await File.findOne({
+            where: { id: id, userId: req.user.userId, isDeleted: false }
+        });
+
+        if (!file) {
+            return res.status(404).json({
+                success: false,
+                error: 'File not found'
+            });
+        }
+
+        // Delete from Telegram if requested
+        if (deleteFromTelegram) {
+            try {
+                await telegramFileService.deleteFromStorage(
+                    file.telegramChatId,
+                    file.telegramMessageId
+                );
+            } catch (error) {
+                console.warn('Warning: Failed to delete from Telegram, but file marked as deleted locally');
+            }
+        }
+
+        // Soft delete from database
+        file.isDeleted = true;
+        file.deletedAt = new Date();
+        await file.save();
+
+        // Update user storage
+        await User.update(
+            { storageUsedBytes: sequelize.literal(`storage_used_bytes - ${file.fileSize}`) },
+            { where: { id: req.user.userId } }
+        );
+
+        res.json({
+            success: true,
+            message: 'File deleted successfully'
+        });
+
+    } catch (error) {
+        console.error('❌ Delete failed:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete file'
+        });
+    }
+}
+
+/**
+ * GET /api/files/search
+ * Search files by filename for current user
+ */
+async function searchFiles(req, res) {
+    try {
+        const { q, page = 1, limit = 50 } = req.query;
+
+        if (!q || !q.trim()) {
+            return res.json({
+                success: true,
+                data: { files: [], total: 0, currentPage: 1, totalPages: 0, hasMore: false }
+            });
+        }
+
+        const { Op } = require('sequelize');
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+
+        const result = await File.findAndCountAll({
+            where: {
+                userId: req.user.userId,
+                isDeleted: false,
+                [Op.or]: [
+                    { originalFilename: { [Op.like]: `%${q.trim()}%` } },
+                    { displayFilename: { [Op.like]: `%${q.trim()}%` } }
+                ]
+            },
+            order: [['createdAt', 'DESC']],
+            limit: parseInt(limit),
+            offset,
+            attributes: { exclude: ['telegramFileId'] }
+        });
+
+        res.json({
+            success: true,
+            data: {
+                files: result.rows,
+                total: result.count,
+                currentPage: parseInt(page),
+                totalPages: Math.ceil(result.count / parseInt(limit)),
+                hasMore: offset + parseInt(limit) < result.count
+            }
+        });
+    } catch (error) {
+        console.error('❌ Search files failed:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to search files'
+        });
+    }
+}
+
+/**
+ * GET /api/files/:id/versions
+ * List version history for a file
+ */
+async function listVersions(req, res) {
+    try {
+        const { id } = req.params;
+
+        const file = await File.findOne({
+            where: { id, userId: req.user.userId, isDeleted: false }
+        });
+
+        if (!file) {
+            return res.status(404).json({
+                success: false,
+                error: 'File not found'
+            });
+        }
+
+        const versions = await versionHistoryService.getVersions(id);
+
+        res.json({
+            success: true,
+            data: { versions }
+        });
+    } catch (error) {
+        console.error('❌ List versions failed:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to list versions'
+        });
+    }
+}
+
+/**
+ * POST /api/files/:id/revert/:versionId
+ * Revert a file to a specific version
+ */
+async function revertVersion(req, res) {
+    try {
+        const { id, versionId } = req.params;
+
+        const file = await File.findOne({
+            where: { id, userId: req.user.userId, isDeleted: false }
+        });
+
+        if (!file) {
+            return res.status(404).json({
+                success: false,
+                error: 'File not found'
+            });
+        }
+
+        const version = await versionHistoryService.revertToFileId(versionId, req.user.userId);
+
+        res.json({
+            success: true,
+            message: `Reverted to version ${version.versionNumber}`,
+            data: { version: version.getMetadata() }
+        });
+    } catch (error) {
+        console.error('❌ Revert version failed:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to revert version: ' + error.message
+        });
+    }
+}
+
+module.exports = {
+    uploadFile,
+    downloadFile,
+    listFiles,
+    searchFiles,
+    listVersions,
+    revertVersion,
+    shareFile,
+    deleteFile,
+    authenticateToken // export for use in routes
+};
+
+
