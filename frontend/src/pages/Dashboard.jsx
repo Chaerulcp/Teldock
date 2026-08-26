@@ -7,6 +7,7 @@ import {
 import { fileApi, folderApi } from '../services/api';
 import { toast } from 'react-toastify';
 import FileViewer, { canPreview } from '../components/FileViewer';
+import { useTransfers } from '../store/transfer-context';
 
 function formatFileSize(bytes) {
   if (!bytes || bytes === 0) return '0 B';
@@ -26,11 +27,10 @@ function getFileMeta(mimeType) {
 }
 
 function Dashboard() {
+  const { uploadFiles, onComplete } = useTransfers();
   const [files, setFiles] = useState([]);
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [encryptUploads, setEncryptUploads] = useState(false);
   const [view, setView] = useState('grid');
@@ -69,26 +69,12 @@ function Dashboard() {
 
   useEffect(() => { loadContent(); }, [loadContent]);
 
-  const handleUpload = async (file) => {
-    if (!file) return;
-    setUploading(true);
-    setUploadProgress(0);
-    const formData = new FormData();
-    formData.append('file', file);
-    if (currentFolder?.id) formData.append('folderId', currentFolder.id);
-    if (encryptUploads) formData.append('encrypt', 'true');
-    try {
-      await fileApi.upload(formData, (evt) => {
-        if (evt.total) setUploadProgress(Math.round((evt.loaded / evt.total) * 100));
-      });
-      toast.success(`"${file.name}" uploaded`);
-      loadContent();
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Upload failed');
-    } finally {
-      setUploading(false);
-      setUploadProgress(0);
-    }
+  // Reload when a transfer completes
+  useEffect(() => onComplete(() => loadContent()), [onComplete, loadContent]);
+
+  const handleUpload = (fileList) => {
+    if (!fileList || fileList.length === 0) return;
+    uploadFiles(fileList, { folderId: currentFolder?.id || null, encrypt: encryptUploads });
   };
 
   const handleDelete = async (id) => {
@@ -205,10 +191,11 @@ function Dashboard() {
   const handleDrop = (e) => {
     e.preventDefault(); e.stopPropagation();
     setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleUpload(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files.length) handleUpload(e.dataTransfer.files);
   };
   const handleChange = (e) => {
-    if (e.target.files && e.target.files[0]) handleUpload(e.target.files[0]);
+    if (e.target.files && e.target.files.length) handleUpload(e.target.files);
+    e.target.value = '';
   };
 
   const filtered = useMemo(() => {
@@ -303,7 +290,7 @@ function Dashboard() {
           className={`relative rounded-2xl border-2 border-dashed p-6 transition-all ${dragActive ? 'border-primary-500 bg-primary-50/60 dark:bg-primary-950/20' : 'border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900'}`}
           onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}
         >
-          <input type="file" id="file-upload" className="hidden" onChange={handleChange} />
+          <input type="file" id="file-upload" className="hidden" multiple onChange={handleChange} />
           <div className="flex flex-col sm:flex-row items-center gap-5">
             <div className="w-12 h-12 rounded-2xl bg-primary-50 dark:bg-primary-950/40 border border-primary-100 dark:border-primary-900/60 grid place-items-center text-primary-600 dark:text-primary-400 flex-shrink-0">
               <UploadCloud className="w-6 h-6" />
@@ -313,21 +300,13 @@ function Dashboard() {
                 Drop files here or <label htmlFor="file-upload" className="text-primary-600 dark:text-primary-400 cursor-pointer hover:underline">browse</label>
                 {currentFolder && <span className="text-ink-400 font-normal"> → into “{currentFolder.name}”</span>}
               </p>
-              <p className="text-sm text-ink-500 dark:text-ink-400 mt-0.5">Any size — large files are split automatically.</p>
+              <p className="text-sm text-ink-500 dark:text-ink-400 mt-0.5">Any size — large files are split automatically. Multiple files supported.</p>
             </div>
             <label className="inline-flex items-center gap-2 text-sm text-ink-600 dark:text-ink-300 cursor-pointer select-none">
               <input type="checkbox" checked={encryptUploads} onChange={(e) => setEncryptUploads(e.target.checked)} className="rounded border-ink-300 text-primary-600 focus:ring-primary-500" />
               <Lock className="w-4 h-4" /> Encrypt
             </label>
           </div>
-          {uploading && (
-            <div className="mt-5">
-              <div className="w-full bg-ink-100 dark:bg-ink-800 rounded-full h-2 overflow-hidden">
-                <div className="h-full bg-primary-500 rounded-full transition-all" style={{ width: `${uploadProgress}%` }} />
-              </div>
-              <p className="text-xs text-ink-500 mt-1.5 font-mono">Uploading… {uploadProgress}%</p>
-            </div>
-          )}
         </div>
 
         {/* Folders */}
