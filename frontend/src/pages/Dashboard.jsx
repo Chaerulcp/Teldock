@@ -2,11 +2,12 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   UploadCloud, FileText, Image as ImageIcon, Video, Music, Download, Share2,
   Trash2, Folder, FolderPlus, Lock, Search, LayoutGrid, List, FileArchive,
-  File as FileIcon, ChevronRight, Home, X, Pencil, FolderInput, CheckSquare, Square
+  File as FileIcon, ChevronRight, Home, X, Pencil, FolderInput, CheckSquare, Square, History
 } from 'lucide-react';
 import { fileApi, folderApi } from '../services/api';
 import { toast } from 'react-toastify';
 import FileViewer, { canPreview } from '../components/FileViewer';
+import VersionHistory from '../components/VersionHistory';
 import { useTransfers } from '../store/transfer-context';
 
 function formatFileSize(bytes) {
@@ -47,6 +48,7 @@ function Dashboard() {
   const [renaming, setRenaming] = useState(null); // file id being renamed
   const [renameValue, setRenameValue] = useState('');
   const [viewerFile, setViewerFile] = useState(null);
+  const [historyFile, setHistoryFile] = useState(null);
 
   const loadContent = useCallback(async () => {
     setLoading(true);
@@ -392,6 +394,7 @@ function Dashboard() {
                       <div className="mt-3 pt-3 border-t border-ink-100 dark:border-ink-800 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => window.open(fileApi.download(file.id), '_blank')} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Download"><Download className="w-4 h-4" /></button>
                         <button onClick={() => { setRenaming(file.id); setRenameValue(file.displayFilename); }} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Rename"><Pencil className="w-4 h-4" /></button>
+                        <button onClick={() => setHistoryFile(file)} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Version history"><History className="w-4 h-4" /></button>
                         <button onClick={() => handleShare(file.id)} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Share"><Share2 className="w-4 h-4" /></button>
                         <button onClick={() => handleDelete(file.id)} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
                       </div>
@@ -431,6 +434,7 @@ function Dashboard() {
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => window.open(fileApi.download(file.id), '_blank')} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Download"><Download className="w-4 h-4" /></button>
                         <button onClick={() => { setRenaming(file.id); setRenameValue(file.displayFilename); }} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Rename"><Pencil className="w-4 h-4" /></button>
+                        <button onClick={() => setHistoryFile(file)} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Version history"><History className="w-4 h-4" /></button>
                         <button onClick={() => handleShare(file.id)} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Share"><Share2 className="w-4 h-4" /></button>
                         <button onClick={() => handleDelete(file.id)} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
                       </div>
@@ -467,6 +471,9 @@ function Dashboard() {
       )}
       {/* File viewer */}
       {viewerFile && <FileViewer file={viewerFile} onClose={() => setViewerFile(null)} />}
+
+      {/* Version history */}
+      {historyFile && <VersionHistory file={historyFile} onClose={() => setHistoryFile(null)} onChanged={loadContent} />}
     </div>
   );
 }
