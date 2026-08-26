@@ -6,7 +6,9 @@ const {
     File,
     SharedLink,
     TelegramConfig,
-    FileVersion
+    FileVersion,
+    FilePart,
+    BotToken
 } = require('../src/models');
 
 async function runMigrations() {
@@ -24,6 +26,8 @@ async function runMigrations() {
         console.log('  - shared_links (id, file_id, creator_id, token, expiration, limits...)');
         console.log('  - user_telegram_configs (id, user_id, bot token, storage chat id...)');
         console.log('  - file_versions (id, file_id, user_id, version_number, checksum...)');
+        console.log('  - file_parts (id, file_id, part_index, telegram refs, encryption iv...)');
+        console.log('  - bot_tokens (id, user_id, encrypted token, bot username...)');
         console.log('\nRelationships:');
         console.log('  • Users → Folders (One-to-Many, CASCADE delete)');
         console.log('  • Folders → Files (One-to-Many, SET NULL on delete)');

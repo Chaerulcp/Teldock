@@ -34,14 +34,13 @@ const File = sequelize.define('File', {
     },
     telegramMessageId: {
         type: DataTypes.INTEGER,
-        allowNull: false,
-        comment: 'Telegram message ID for the file'
+        allowNull: true,
+        comment: 'Telegram message ID for single-message files (null for chunked files)'
     },
     telegramFileId: {
         type: DataTypes.STRING(255),
-        allowNull: false,
-        unique: true,
-        comment: 'Telegram internal file ID'
+        allowNull: true,
+        comment: 'Telegram internal file ID for single-message files (null for chunked files)'
     },
     // Original file info
     originalFilename: {
@@ -63,6 +62,34 @@ const File = sequelize.define('File', {
         type: DataTypes.BIGINT,
         allowNull: false,
         comment: 'File size in bytes'
+    },
+    // Chunked / large-file storage (teldrive-style)
+    isChunked: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        comment: 'Whether the file is split across multiple Telegram messages'
+    },
+    partCount: {
+        type: DataTypes.INTEGER,
+        defaultValue: 1,
+        comment: 'Number of parts the file is split into'
+    },
+    // Encryption metadata (opt-in AES-256)
+    isEncrypted: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        comment: 'Whether file parts are encrypted at rest'
+    },
+    encryptionSalt: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        comment: 'Hex salt used to derive the per-file encryption key'
+    },
+    // Integrity
+    checksum: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        comment: 'SHA-256 checksum of the original file'
     },
     // Sharing & permissions
     isPublic: {

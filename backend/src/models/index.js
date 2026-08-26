@@ -5,6 +5,8 @@ const File = require('./File');
 const SharedLink = require('./SharedLink');
 const TelegramConfig = require('./TelegramConfig');
 const FileVersion = require('./FileVersion');
+const FilePart = require('./FilePart');
+const { BotToken } = require('./BotToken');
 
 // Set up associations
 User.hasMany(FileVersion, { foreignKey: 'userId', as: 'fileVersions' });
@@ -31,6 +33,12 @@ FileVersion.belongsTo(File, { foreignKey: 'fileId', as: 'file' });
 Folder.hasMany(File, { foreignKey: 'folderId', as: 'files' });
 File.belongsTo(Folder, { foreignKey: 'folderId', as: 'folder' });
 
+File.hasMany(FilePart, { foreignKey: 'fileId', as: 'parts' });
+FilePart.belongsTo(File, { foreignKey: 'fileId', as: 'file' });
+
+User.hasMany(BotToken, { foreignKey: 'userId', as: 'botTokens' });
+BotToken.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
 module.exports = {
     sequelize,
     User,
@@ -38,5 +46,7 @@ module.exports = {
     File,
     SharedLink,
     TelegramConfig,
-    FileVersion
+    FileVersion,
+    FilePart,
+    BotToken
 };
