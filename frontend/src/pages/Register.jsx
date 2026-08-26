@@ -61,7 +61,7 @@ function Register() {
           <div className="w-9 h-9 rounded-xl bg-primary-500 grid place-items-center">
             <Cloud className="w-5 h-5 text-white" />
           </div>
-          <span className="font-display font-bold text-lg">Dryv</span>
+          <span className="font-display font-bold text-lg">Teldock</span>
         </Link>
         <div className="relative">
           <h1 className="font-display font-bold text-4xl text-white leading-tight tracking-tight">

@@ -19,7 +19,7 @@ function Landing() {
             <div className="w-9 h-9 rounded-xl bg-primary-500 grid place-items-center shadow-glow">
               <Cloud className="w-5 h-5 text-white" />
             </div>
-            <span className="font-display font-bold text-lg tracking-tight">Dryv</span>
+            <span className="font-display font-bold text-lg tracking-tight">Teldock</span>
           </div>
 
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-ink-600 dark:text-ink-300">
@@ -65,7 +65,7 @@ function Landing() {
               Managed like a real drive.
             </h1>
             <p className="mt-6 text-lg text-ink-600 dark:text-ink-300 leading-relaxed max-w-[52ch]">
-              Dryv turns a Telegram channel into a private cloud drive. Upload files of any size,
+              Teldock turns a Telegram channel into a private cloud drive. Upload files of any size,
               stream media, encrypt on the fly, and share with signed links.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-4">
@@ -99,7 +99,7 @@ function Landing() {
                   <span className="w-3 h-3 rounded-full bg-red-400" />
                   <span className="w-3 h-3 rounded-full bg-amber-400" />
                   <span className="w-3 h-3 rounded-full bg-primary-400" />
-                  <span className="ml-3 text-xs font-mono text-ink-400">Dryv / my drive</span>
+                  <span className="ml-3 text-xs font-mono text-ink-400">Teldock / my drive</span>
                 </div>
                 <div className="p-5 space-y-3">
                   {[
@@ -189,7 +189,7 @@ function Landing() {
           <div className="mt-14 grid md:grid-cols-3 gap-8">
             {[
               { n: '01', title: 'Connect a bot', body: 'Create a bot with @BotFather and point it at a private channel you control.' },
-              { n: '02', title: 'Upload anything', body: 'Drag files in — Dryv chunks, optionally encrypts, and streams them to Telegram.' },
+              { n: '02', title: 'Upload anything', body: 'Drag files in — Teldock chunks, optionally encrypts, and streams them to Telegram.' },
               { n: '03', title: 'Access anywhere', body: 'Browse, stream, share, or mount via WebDAV from any device.' },
             ].map((s) => (
               <div key={s.n} className="relative">
@@ -262,7 +262,7 @@ function Landing() {
             <div className="w-7 h-7 rounded-lg bg-primary-500 grid place-items-center">
               <Cloud className="w-4 h-4 text-white" />
             </div>
-            <span className="font-display font-semibold">Dryv</span>
+            <span className="font-display font-semibold">Teldock</span>
             <span className="text-sm text-ink-400 ml-2">Telegram Cloud Storage</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-ink-500">

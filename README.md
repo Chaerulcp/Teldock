@@ -1,6 +1,6 @@
-# Telegram Cloud Storage
+# Teldock
 
-A full-stack cloud storage application that uses the **Telegram Bot API** as its file storage backend. Files are streamed to a private Telegram chat/channel, while the application database stores only lightweight metadata (filenames, MIME types, sizes, Telegram references, sharing tokens). This keeps local/VPS disk usage minimal while leveraging Telegram's infrastructure for the actual file bytes.
+**Teldock** is a full-stack cloud storage application that uses the **Telegram Bot API** as its file storage backend. Files are streamed to a private Telegram chat/channel, while the application database stores only lightweight metadata (filenames, MIME types, sizes, Telegram references, sharing tokens). This keeps local/VPS disk usage minimal while leveraging Telegram's infrastructure for the actual file bytes.
 
 ![Node.js](https://img.shields.io/badge/Node.js-22.x-339933?logo=node.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18.x-61DAFB?logo=react&logoColor=black)
