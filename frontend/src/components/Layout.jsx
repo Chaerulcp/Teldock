@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, NavLink, Link } from 'react-router-dom';
-import { File, LogOut, Cloud, Settings, Smartphone, Moon, Sun, HardDrive, AlertTriangle } from 'lucide-react';
+import { File, LogOut, Cloud, Settings, Smartphone, Moon, Sun, HardDrive, AlertTriangle, Share2, BarChart3 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../store/auth-store';
 import { useThemeStore } from '../store/theme-store';
 import { userApi } from '../services/api';
+import TransferCenter from './TransferCenter';
 
 function formatBytes(bytes) {
   const b = Number(bytes || 0);
@@ -49,6 +50,8 @@ function Layout() {
   const navItems = [
     { to: '/dashboard', icon: File, label: 'All Files', end: true },
     { to: '/dashboard/mobile', icon: Smartphone, label: 'Browse' },
+    { to: '/dashboard/shares', icon: Share2, label: 'Shared Links' },
+    { to: '/dashboard/stats', icon: BarChart3, label: 'Storage Stats' },
     { to: '/dashboard/settings', icon: Settings, label: 'Settings' },
   ];
 
@@ -144,6 +147,8 @@ function Layout() {
           <Outlet />
         </main>
       </div>
+
+      <TransferCenter />
     </div>
   );
 }

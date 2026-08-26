@@ -7,6 +7,8 @@ import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Settings from './pages/Settings'
 import MobileDashboard from './pages/MobileDashboard'
+import Shares from './pages/Shares'
+import Stats from './pages/Stats'
 
 function App() {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -31,6 +33,8 @@ function App() {
       <Route path="/dashboard" element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}>
         <Route index element={<Dashboard />} />
         <Route path="mobile" element={<MobileDashboard />} />
+        <Route path="shares" element={<Shares />} />
+        <Route path="stats" element={<Stats />} />
         <Route path="settings" element={<Settings />} />
       </Route>
 

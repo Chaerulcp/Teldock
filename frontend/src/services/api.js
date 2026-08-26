@@ -115,4 +115,16 @@ export const botApi = {
   remove: (id) => api.delete(`/bots/${id}`),
 };
 
+// Share management API calls
+export const shareApi = {
+  list: (params) => api.get('/shares', { params }),
+  revoke: (id) => api.delete(`/shares/${id}`),
+};
+
+// Stats API calls
+export const statsApi = {
+  storage: () => api.get('/stats/storage'),
+  duplicates: () => api.get('/stats/duplicates'),
+};
+
 export default api;
