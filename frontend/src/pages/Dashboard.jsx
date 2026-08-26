@@ -1,17 +1,20 @@
-import { useState, useEffect } from 'react';
-import { UploadCloud, FileText, Image as ImageIcon, Video, Music, Download, Share2, MoreHorizontal, Folder, Lock } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import {
+  UploadCloud, FileText, Image as ImageIcon, Video, Music, Download, Share2,
+  Trash2, Folder, Lock, Search, LayoutGrid, List, FileArchive, File as FileIcon
+} from 'lucide-react';
 import { fileApi } from '../services/api';
 import { toast } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
 
 function Dashboard() {
-  const navigate = useNavigate();
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [encryptUploads, setEncryptUploads] = useState(false);
+  const [view, setView] = useState('grid');
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     loadFiles();
@@ -30,24 +33,19 @@ function Dashboard() {
 
   const handleUpload = async (file) => {
     if (!file) return;
-
     setUploading(true);
     setUploadProgress(0);
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('description', `Uploaded ${file.name}`);
     if (encryptUploads) formData.append('encrypt', 'true');
 
     try {
       await fileApi.upload(formData, (evt) => {
-        if (evt.total) {
-          setUploadProgress(Math.round((evt.loaded / evt.total) * 100));
-        }
+        if (evt.total) setUploadProgress(Math.round((evt.loaded / evt.total) * 100));
       });
-      toast.success(`File "${file.name}" uploaded successfully!`);
+      toast.success(`"${file.name}" uploaded`);
       loadFiles();
     } catch (error) {
-      console.error('Upload failed:', error);
       toast.error(error.response?.data?.error || 'Upload failed');
     } finally {
       setUploading(false);
@@ -56,205 +54,255 @@ function Dashboard() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this file?')) return;
-
+    if (!confirm('Delete this file?')) return;
     try {
       await fileApi.delete(id);
-      toast.success('File deleted successfully');
+      toast.success('File deleted');
       loadFiles();
-    } catch (error) {
+    } catch {
       toast.error('Failed to delete file');
     }
   };
 
-  const handleShare = async (id, name) => {
+  const handleShare = async (id) => {
     try {
       const response = await fileApi.share(id, { expiresIn: 86400, downloadLimit: 5 });
-      const shortUrl = response.data.data.link.shortUrl;
-      
-      navigator.clipboard.writeText(shortUrl);
-      toast.success('Link copied to clipboard!');
-    } catch (error) {
+      navigator.clipboard.writeText(response.data.data.link.shortUrl);
+      toast.success('Share link copied to clipboard');
+    } catch {
       toast.error('Failed to create share link');
     }
   };
 
-  const getFileIcon = (mimeType) => {
-    if (mimeType.startsWith('image/')) return <ImageIcon className="w-6 h-6 text-green-500" />;
-    if (mimeType.startsWith('video/')) return <Video className="w-6 h-6 text-purple-500" />;
-    if (mimeType.startsWith('audio/')) return <Music className="w-6 h-6 text-yellow-500" />;
-    return <FileText className="w-6 h-6 text-blue-500" />;
+  const getFileMeta = (mimeType) => {
+    if (mimeType?.startsWith('image/')) return { Icon: ImageIcon, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-950/30' };
+    if (mimeType?.startsWith('video/')) return { Icon: Video, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-950/30' };
+    if (mimeType?.startsWith('audio/')) return { Icon: Music, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-950/30' };
+    if (mimeType?.includes('zip') || mimeType?.includes('rar') || mimeType?.includes('7z') || mimeType?.includes('gzip')) return { Icon: FileArchive, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-950/30' };
+    if (mimeType?.includes('pdf')) return { Icon: FileText, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-950/30' };
+    return { Icon: FileIcon, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/30' };
   };
 
   const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
+    if (!bytes || bytes === 0) return '0 B';
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
   };
 
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
-    }
+    if (e.type === 'dragenter' || e.type === 'dragover') setDragActive(true);
+    else if (e.type === 'dragleave') setDragActive(false);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleUpload(e.dataTransfer.files[0]);
-    }
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleUpload(e.dataTransfer.files[0]);
   };
 
   const handleChange = (e) => {
-    e.preventDefault();
-    if (e.target.files && e.target.files[0]) {
-      handleUpload(e.target.files[0]);
-    }
+    if (e.target.files && e.target.files[0]) handleUpload(e.target.files[0]);
   };
 
-  return (
-    <div className="p-6 space-y-6">
-      {/* Upload Area */}
-      <div
-        className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
-          dragActive ? 'border-primary-500 bg-primary-50' : 'border-gray-300 bg-white hover:border-gray-400'
-        }`}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-      >
-        <input
-          type="file"
-          id="file-upload"
-          className="hidden"
-          onChange={handleChange}
-        />
-        
-        <div className="space-y-4">
-          <UploadCloud className="mx-auto w-16 h-16 text-gray-400" />
-          <p className="text-lg font-medium text-gray-900">
-            Drag & drop files here or <label htmlFor="file-upload" className="text-primary-600 cursor-pointer hover:text-primary-500">browse</label>
-          </p>
-          <p className="text-sm text-gray-500">Large files are automatically split into parts — no 50MB limit</p>
+  const filtered = useMemo(() => {
+    if (!query.trim()) return files;
+    const q = query.toLowerCase();
+    return files.filter((f) => f.displayFilename?.toLowerCase().includes(q));
+  }, [files, query]);
 
-          <label className="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={encryptUploads}
-              onChange={(e) => setEncryptUploads(e.target.checked)}
-              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-            />
-            <Lock className="w-4 h-4" />
-            Encrypt this upload (AES-256)
-          </label>
+  return (
+    <div className="min-h-[100dvh]">
+      {/* Topbar */}
+      <header className="sticky top-0 z-20 bg-ink-50/80 dark:bg-ink-950/80 backdrop-blur-md border-b border-ink-200/70 dark:border-ink-800/70">
+        <div className="px-6 h-16 flex items-center gap-4">
+          <div>
+            <h1 className="font-display font-bold text-lg text-ink-900 dark:text-white leading-none">My Files</h1>
+            <p className="text-xs text-ink-400 mt-0.5">{files.length} items</p>
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            <div className="relative hidden sm:block">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search files…"
+                className="w-56 pl-9 pr-3 py-2 rounded-lg text-sm bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 text-ink-900 dark:text-white placeholder-ink-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+              />
+            </div>
+            <div className="flex items-center rounded-lg border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 p-0.5">
+              <button
+                onClick={() => setView('grid')}
+                className={`w-8 h-8 grid place-items-center rounded-md transition-colors ${view === 'grid' ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-600 dark:text-primary-400' : 'text-ink-400 hover:text-ink-600'}`}
+                aria-label="Grid view"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setView('list')}
+                className={`w-8 h-8 grid place-items-center rounded-md transition-colors ${view === 'list' ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-600 dark:text-primary-400' : 'text-ink-400 hover:text-ink-600'}`}
+                aria-label="List view"
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="p-6 space-y-6">
+        {/* Upload zone */}
+        <div
+          className={`relative rounded-2xl border-2 border-dashed p-8 transition-all ${
+            dragActive
+              ? 'border-primary-500 bg-primary-50/60 dark:bg-primary-950/20'
+              : 'border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900'
+          }`}
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
+        >
+          <input type="file" id="file-upload" className="hidden" onChange={handleChange} />
+          <div className="flex flex-col sm:flex-row items-center gap-5">
+            <div className="w-14 h-14 rounded-2xl bg-primary-50 dark:bg-primary-950/40 border border-primary-100 dark:border-primary-900/60 grid place-items-center text-primary-600 dark:text-primary-400 flex-shrink-0">
+              <UploadCloud className="w-7 h-7" />
+            </div>
+            <div className="flex-1 text-center sm:text-left">
+              <p className="font-display font-semibold text-ink-900 dark:text-white">
+                Drop files here or{' '}
+                <label htmlFor="file-upload" className="text-primary-600 dark:text-primary-400 cursor-pointer hover:underline">browse</label>
+              </p>
+              <p className="text-sm text-ink-500 dark:text-ink-400 mt-0.5">Any size — large files are split automatically.</p>
+            </div>
+            <label className="inline-flex items-center gap-2 text-sm text-ink-600 dark:text-ink-300 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={encryptUploads}
+                onChange={(e) => setEncryptUploads(e.target.checked)}
+                className="rounded border-ink-300 text-primary-600 focus:ring-primary-500"
+              />
+              <Lock className="w-4 h-4" /> Encrypt
+            </label>
+          </div>
 
           {uploading && (
-            <div className="mt-4 p-3 bg-primary-50 rounded-lg">
-              <div className="w-full bg-primary-100 rounded-full h-2 overflow-hidden">
-                <div
-                  className="h-2 bg-primary-600 transition-all"
-                  style={{ width: `${uploadProgress}%` }}
-                ></div>
+            <div className="mt-5">
+              <div className="w-full bg-ink-100 dark:bg-ink-800 rounded-full h-2 overflow-hidden">
+                <div className="h-full bg-primary-500 rounded-full transition-all" style={{ width: `${uploadProgress}%` }} />
               </div>
-              <p className="text-sm text-primary-700 mt-2">Uploading… {uploadProgress}%</p>
+              <p className="text-xs text-ink-500 mt-1.5 font-mono">Uploading… {uploadProgress}%</p>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Files List */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Your Files</h3>
-          <p className="text-sm text-gray-500">{files.length} files stored in Telegram Cloud</p>
-        </div>
-
+        {/* Files */}
         {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          view === 'grid' ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 p-4 animate-pulse">
+                  <div className="w-12 h-12 rounded-xl bg-ink-100 dark:bg-ink-800" />
+                  <div className="mt-4 h-3 bg-ink-100 dark:bg-ink-800 rounded w-3/4" />
+                  <div className="mt-2 h-2.5 bg-ink-100 dark:bg-ink-800 rounded w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="h-14 rounded-xl bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-800 animate-pulse" />
+              ))}
+            </div>
+          )
+        ) : filtered.length === 0 ? (
+          <div className="rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 py-20 text-center">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-ink-100 dark:bg-ink-800 grid place-items-center">
+              <Folder className="w-8 h-8 text-ink-400" />
+            </div>
+            <p className="mt-4 font-display font-semibold text-ink-900 dark:text-white">
+              {query ? 'No matching files' : 'No files yet'}
+            </p>
+            <p className="mt-1 text-sm text-ink-500">
+              {query ? 'Try a different search.' : 'Upload your first file to get started.'}
+            </p>
           </div>
-        ) : files.length === 0 ? (
-          <div className="py-12 text-center">
-            <Folder className="mx-auto w-12 h-12 text-gray-400 mb-4" />
-            <p className="text-gray-500">No files yet. Upload your first file!</p>
+        ) : view === 'grid' ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {filtered.map((file) => {
+              const { Icon, color, bg } = getFileMeta(file.mimeType);
+              return (
+                <div
+                  key={file.id}
+                  className="group rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 p-4 hover:shadow-card hover:-translate-y-0.5 transition-all"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className={`w-12 h-12 rounded-xl grid place-items-center ${bg}`}>
+                      <Icon className={`w-6 h-6 ${color}`} />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {file.isEncrypted && <Lock className="w-3.5 h-3.5 text-ink-400" />}
+                      {file.isChunked && (
+                        <span className="text-[10px] font-mono font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 px-1.5 py-0.5 rounded">{file.partCount}×</span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="mt-4 text-sm font-medium text-ink-900 dark:text-white truncate" title={file.displayFilename}>
+                    {file.displayFilename}
+                  </p>
+                  <p className="text-xs text-ink-400 font-mono mt-0.5">{formatFileSize(file.fileSize)}</p>
+                  <div className="mt-3 pt-3 border-t border-ink-100 dark:border-ink-800 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => window.open(fileApi.download(file.id), '_blank')} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Download">
+                      <Download className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => handleShare(file.id)} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Share">
+                      <Share2 className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => handleDelete(file.id)} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 transition-colors" title="Delete">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {files.map((file) => (
-                  <tr key={file.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {getFileIcon(file.mimeType)}
-                        <span className="ml-3 text-sm font-medium text-gray-900 truncate max-w-md">{file.displayFilename}</span>
-                        {file.isEncrypted && (
-                          <Lock className="ml-2 w-3.5 h-3.5 text-gray-400" title="Encrypted" />
-                        )}
-                        {file.isChunked && (
-                          <span className="ml-2 px-1.5 py-0.5 text-[10px] font-semibold text-primary-700 bg-primary-100 rounded" title={`${file.partCount} parts`}>
-                            {file.partCount}×
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatFileSize(file.fileSize)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {file.mimeType.split('/')[1]?.toUpperCase() || 'FILE'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(file.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end space-x-2">
-                        <button
-                          onClick={() => window.open(fileApi.download(file.id), '_blank')}
-                          className="text-primary-600 hover:text-primary-900 p-2 hover:bg-primary-50 rounded"
-                          title="Download"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleShare(file.id, file.displayFilename)}
-                          className="text-green-600 hover:text-green-900 p-2 hover:bg-green-50 rounded"
-                          title="Share"
-                        >
-                          <Share2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(file.id)}
-                          className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded"
-                          title="Delete"
-                        >
-                          <MoreHorizontal className="w-4 h-4 rotate-90" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="rounded-2xl border border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900 overflow-hidden divide-y divide-ink-100 dark:divide-ink-800">
+            {filtered.map((file) => {
+              const { Icon, color, bg } = getFileMeta(file.mimeType);
+              return (
+                <div key={file.id} className="group flex items-center gap-4 px-4 py-3 hover:bg-ink-50 dark:hover:bg-ink-950/40 transition-colors">
+                  <div className={`w-10 h-10 rounded-lg grid place-items-center flex-shrink-0 ${bg}`}>
+                    <Icon className={`w-5 h-5 ${color}`} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-ink-900 dark:text-white truncate">{file.displayFilename}</p>
+                      {file.isEncrypted && <Lock className="w-3.5 h-3.5 text-ink-400 flex-shrink-0" />}
+                      {file.isChunked && (
+                        <span className="text-[10px] font-mono font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 px-1.5 py-0.5 rounded flex-shrink-0">{file.partCount}×</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-ink-400 font-mono">{formatFileSize(file.fileSize)} · {new Date(file.createdAt).toLocaleDateString()}</p>
+                  </div>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => window.open(fileApi.download(file.id), '_blank')} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Download">
+                      <Download className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => handleShare(file.id)} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Share">
+                      <Share2 className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => handleDelete(file.id)} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 transition-colors" title="Delete">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

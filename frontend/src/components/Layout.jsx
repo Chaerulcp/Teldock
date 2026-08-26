@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Outlet, useNavigate, Link } from 'react-router-dom';
-import { File, LogOut, Upload, Folder, Download, Share2, Cloud, Settings, Smartphone, Moon, Sun } from 'lucide-react';
+import { Outlet, useNavigate, NavLink } from 'react-router-dom';
+import { File, LogOut, Cloud, Settings, Smartphone, Moon, Sun, HardDrive } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../store/auth-store';
 import { useThemeStore } from '../store/theme-store';
@@ -15,99 +15,101 @@ function Layout() {
 
   useEffect(() => {
     if (user) {
-      const percentage = ((user.storageUsedBytes / user.storageQuotaBytes) * 100).toFixed(2);
+      const percentage = ((user.storageUsedBytes / user.storageQuotaBytes) * 100).toFixed(1);
       setStorageUsed(parseFloat(percentage));
     }
   }, [user]);
 
   const handleLogout = () => {
     logout();
-    toast.success('Logged out successfully');
+    toast.success('Signed out');
     navigate('/login');
   };
 
+  const usedMB = ((user?.storageUsedBytes || 0) / 1024 / 1024).toFixed(0);
+  const quotaGB = ((user?.storageQuotaBytes || 0) / 1024 / 1024 / 1024).toFixed(0);
+
+  const navItems = [
+    { to: '/dashboard', icon: File, label: 'All Files', end: true },
+    { to: '/dashboard/mobile', icon: Smartphone, label: 'Browse' },
+    { to: '/dashboard/settings', icon: Settings, label: 'Settings' },
+  ];
+
+  const navClass = ({ isActive }) =>
+    `flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+      isActive
+        ? 'bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300'
+        : 'text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-ink-800/60'
+    }`;
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-[100dvh] bg-ink-50 dark:bg-ink-950 font-sans">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-sm hidden md:block">
-        <div className="p-6">
-          <div className="flex items-center space-x-3 mb-8">
-            <Cloud className="w-8 h-8 text-primary-500" />
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">Cloud Storage</h1>
-          </div>
-
-          {/* User Info */}
-          <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-700 rounded-lg">
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{user?.username || user?.email}</p>
-            <div className="mt-3">
-              <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
-                <span>Storage</span>
-                <span>{storageUsed}%</span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
-                <div 
-                  className={`h-2 rounded-full transition-all ${
-                    storageUsed > 80 ? 'bg-red-500' : storageUsed > 60 ? 'bg-yellow-500' : 'bg-green-500'
-                  }`}
-                  style={{ width: `${storageUsed}%` }}
-                ></div>
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {(user?.storageUsedBytes / 1024 / 1024).toFixed(0)} MB / {(user?.storageQuotaBytes / 1024 / 1024 / 1024).toFixed(2)} GB
-              </p>
+      <aside className="fixed left-0 top-0 h-full w-64 bg-white dark:bg-ink-900 border-r border-ink-200/70 dark:border-ink-800/70 hidden md:flex md:flex-col">
+        <div className="p-5">
+          <div className="flex items-center gap-2.5 mb-8">
+            <div className="w-9 h-9 rounded-xl bg-primary-500 grid place-items-center shadow-glow">
+              <Cloud className="w-5 h-5 text-white" />
             </div>
+            <span className="font-display font-bold text-lg tracking-tight text-ink-900 dark:text-white">Nimbus</span>
           </div>
 
-          {/* Navigation */}
-          <nav className="space-y-2">
-            <Link to="/" className="flex items-center space-x-3 px-4 py-3 bg-primary-50 dark:bg-gray-700 text-primary-700 dark:text-primary-300 rounded-lg font-medium">
-              <File className="w-5 h-5" />
-              <span>All Files</span>
-            </Link>
-            <Link to="/mobile" className="flex items-center space-x-3 px-4 py-3 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
-              <Smartphone className="w-5 h-5" />
-              <span>Browse (Mobile)</span>
-            </Link>
-            <Link to="/settings" className="flex items-center space-x-3 px-4 py-3 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
-              <Settings className="w-5 h-5" />
-              <span>Settings</span>
-            </Link>
+          <nav className="space-y-1">
+            {navItems.map((item) => (
+              <NavLink key={item.to} to={item.to} end={item.end} className={navClass}>
+                <item.icon className="w-[18px] h-[18px]" />
+                <span>{item.label}</span>
+              </NavLink>
+            ))}
           </nav>
         </div>
 
-        {/* Footer */}
-        <div className="absolute bottom-0 w-full p-6 border-t border-gray-200 dark:border-gray-700 space-y-2">
-          <button
-            onClick={toggleTheme}
-            className="flex items-center space-x-3 w-full px-4 py-3 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
-          >
-            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
-          </button>
+        <div className="mt-auto p-5 space-y-4">
+          {/* Storage widget */}
+          <div className="p-4 rounded-2xl bg-ink-50 dark:bg-ink-950/60 border border-ink-100 dark:border-ink-800">
+            <div className="flex items-center gap-2 mb-3">
+              <HardDrive className="w-4 h-4 text-primary-500" />
+              <span className="text-xs font-semibold text-ink-700 dark:text-ink-300">Storage</span>
+              <span className="ml-auto text-xs font-mono text-ink-400">{storageUsed}%</span>
+            </div>
+            <div className="w-full bg-ink-200 dark:bg-ink-800 rounded-full h-1.5 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${storageUsed > 80 ? 'bg-red-500' : storageUsed > 60 ? 'bg-amber-500' : 'bg-primary-500'}`}
+                style={{ width: `${Math.min(storageUsed, 100)}%` }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-ink-400 font-mono">{usedMB} MB / {quotaGB} GB</p>
+          </div>
+
+          {/* User + actions */}
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-full bg-primary-100 dark:bg-primary-950/60 grid place-items-center text-primary-700 dark:text-primary-400 font-semibold text-sm flex-shrink-0">
+              {(user?.username || user?.email || 'U')[0].toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-ink-900 dark:text-white truncate">{user?.username || 'User'}</p>
+              <p className="text-xs text-ink-400 truncate">{user?.email}</p>
+            </div>
+            <button
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+              className="w-8 h-8 grid place-items-center rounded-lg text-ink-400 hover:bg-ink-100 dark:hover:bg-ink-800 transition-colors"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+          </div>
           <button
             onClick={handleLogout}
-            className="flex items-center space-x-3 w-full px-4 py-3 text-gray-600 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 rounded-lg transition-colors"
+            className="flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl text-sm font-medium text-ink-600 dark:text-ink-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 dark:hover:text-red-400 transition-colors"
           >
-            <LogOut className="w-5 h-5" />
-            <span>Sign Out</span>
+            <LogOut className="w-[18px] h-[18px]" />
+            <span>Sign out</span>
           </button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <div className="md:ml-64 min-h-screen">
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
-          <div className="px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Upload className="w-5 h-5 text-gray-400" />
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Your Files</h2>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600 dark:text-gray-400">{new Date().toLocaleDateString()}</span>
-            </div>
-          </div>
-        </header>
-
+      {/* Main */}
+      <div className="md:ml-64 min-h-[100dvh]">
         <main>
           <Outlet />
         </main>

@@ -157,9 +157,9 @@ function MobileDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
+    <div className="min-h-[100dvh] bg-ink-50 dark:bg-ink-950 pb-20 md:pb-0">
       {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-20">
+      <header className="bg-white dark:bg-ink-900 border-b border-ink-200/70 dark:border-ink-800/70 sticky top-0 z-20">
         <div className="px-4 py-3 flex items-center justify-between">
           <button 
             onClick={() => setShowSidebar(true)}

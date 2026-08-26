@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/auth-store'
 import Layout from './components/Layout'
+import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
@@ -12,23 +13,27 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary-500"></div>
+      <div className="min-h-screen flex items-center justify-center bg-ink-50 dark:bg-ink-950">
+        <div className="animate-spin rounded-full h-12 w-12 border-2 border-primary-500 border-t-transparent"></div>
       </div>
     )
   }
 
   return (
     <Routes>
-      <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" />} />
-      <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/" />} />
-      
-      <Route path="/" element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}>
+      {/* Public landing page */}
+      <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" /> : <Landing />} />
+
+      <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} />
+      <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/dashboard" />} />
+
+      {/* Authenticated app */}
+      <Route path="/dashboard" element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}>
         <Route index element={<Dashboard />} />
         <Route path="mobile" element={<MobileDashboard />} />
         <Route path="settings" element={<Settings />} />
       </Route>
-      
+
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   )
