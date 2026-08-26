@@ -34,10 +34,10 @@ A full-stack cloud storage application that uses the **Telegram Bot API** as its
 **How it works:**
 
 1. A file is uploaded through the web interface.
-2. The backend streams the file to a Telegram chat/channel via the Bot API (`sendDocument`).
-3. Telegram returns metadata (`file_id`, `message_id`, etc.).
-4. The database stores only that metadata plus ownership and sharing info — never the raw file.
-5. On download, the backend resolves the Telegram `file_path` and redirects to the Telegram CDN so bytes stream directly to the client.
+2. The backend splits the file into parts (~18 MB each) and streams each part to a Telegram chat/channel via the Bot API (`sendDocument`), spreading parts across the user's bot pool.
+3. Telegram returns metadata (`file_id`, `message_id`) for every part.
+4. The database stores only that metadata plus ownership, ordering, and (optional) encryption info — never the raw file.
+5. On download, the backend resolves each part's Telegram `file_path`, fetches and (if needed) decrypts the parts, and streams them back in order — honoring HTTP `Range` requests for seeking/resuming.
 
 This design avoids storing large files on the server disk and offloads bandwidth to Telegram's CDN.
 
@@ -52,12 +52,20 @@ This design avoids storing large files on the server disk and offloads bandwidth
 - Protected routes with bearer-token middleware
 
 **File management**
-- Upload files (up to 50 MB per file via the standard Bot API) with streaming
+- Upload files of **any size** — large files are automatically split into ~18 MB parts across multiple Telegram messages (bypasses the 50 MB Bot API limit)
+- Streaming download that stitches parts back together, with **HTTP Range/seek** support (resumable downloads, in-browser media seeking)
 - List files with pagination, sorting, and folder filtering
 - Filename-based search (`/api/files/search`)
-- Download via redirect to the Telegram CDN
 - Soft delete (recoverable) with per-user storage quota accounting
 - File version history with revert support
+
+**Performance & scale (teldrive-inspired)**
+- **Multi-bot token pool** — add several bot tokens and requests are spread round-robin across them for higher upload/download throughput
+- Chunked, retryable part uploads with exponential backoff
+- **WebDAV endpoint** (`/webdav`) for Rclone / native OS mounting
+
+**Encryption**
+- Opt-in **AES-256-CTR** encryption per file, with a random salt per file and a random IV per part
 
 **Folders**
 - Hierarchical folder tree (create, rename, delete)
@@ -230,7 +238,9 @@ Configure these in `backend/.env` (see `backend/.env.example`):
 | `TELEGRAM_BOT_TOKEN` | Global bot token (fallback) |
 | `TELEGRAM_STORAGE_CHAT_ID` | Global storage chat/channel ID |
 | `TELEGRAM_API_URL` | Base Bot API URL, e.g. `https://api.telegram.org/bot<token>` |
-| `ENCRYPTION_KEY` | Key for encrypting per-user Telegram credentials |
+| `ENCRYPTION_KEY` | Key for encrypting per-user Telegram credentials & files |
+| `TG_PART_SIZE` | Chunk size in bytes for large-file splitting (default 18 MB) |
+| `MAX_UPLOAD_BYTES` | Max accepted upload size (default 2 GB) |
 | `REDIS_HOST` / `REDIS_PORT` | Redis connection (optional, preview queue) |
 | `CORS_ORIGIN` | Allowed frontend origin (default `http://localhost:3000`) |
 | `BCRYPT_ROUNDS` | bcrypt cost factor |
@@ -279,7 +289,7 @@ All protected endpoints require an `Authorization: Bearer <accessToken>` header.
 | `POST` | `/files/upload` | Upload a file (multipart, field `file`) |
 | `GET` | `/files` | List files (pagination, `folderId`, sorting) |
 | `GET` | `/files/search?q=` | Search files by filename |
-| `GET` | `/files/:id/download` | Redirect-download from Telegram CDN |
+| `GET` | `/files/:id/download` | Stream download (stitched parts, supports Range) |
 | `GET` | `/files/:id/versions` | List version history for a file |
 | `POST` | `/files/:id/revert/:versionId` | Revert a file to a version |
 | `POST` | `/files/:id/share` | Create a shared link |
@@ -293,6 +303,18 @@ All protected endpoints require an `Authorization: Bearer <accessToken>` header.
 | `POST` | `/folders` | Create a folder |
 | `PUT` | `/folders/:id` | Rename a folder |
 | `DELETE` | `/folders/:id` | Delete a folder (files detached to root) |
+
+### Bot pool (multi-bot throughput)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/bots` | List bots in the pool |
+| `POST` | `/bots` | Add a bot token (validated) |
+| `DELETE` | `/bots/:id` | Remove a bot from the pool |
+
+### WebDAV (Rclone-compatible)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `PROPFIND/GET/PUT/DELETE/MKCOL/MOVE` | `/webdav/*` | Mount as a remote via Rclone (HTTP Basic auth) |
 
 ### Telegram configuration (per user)
 | Method | Endpoint | Description |
@@ -337,12 +359,16 @@ Six tables managed by Sequelize (`npm run migrate`):
 |-------|---------|
 | `users` | Accounts, credentials, storage quota tracking |
 | `folders` | Hierarchical folder tree (path, depth, parent) |
-| `files` | File metadata + Telegram references + sharing/download tracking |
+| `files` | File metadata + Telegram references + chunk/encryption flags + sharing/download tracking |
+| `file_parts` | Per-part Telegram references for chunked files (order, IV, checksum) |
+| `bot_tokens` | Encrypted per-user bot tokens for the multi-bot pool |
 | `shared_links` | Signed link tokens with expiry, limits, password |
 | `file_versions` | Version history per file with checksums |
 | `user_telegram_configs` | Per-user encrypted Telegram credentials |
 
 Primary keys are UUIDs. Foreign keys enforce cascade/detach behavior for data integrity.
+
+> After pulling updates that add chunked storage, run `npm run migrate:chunked` to add the new columns/tables to an existing database.
 
 ---
 
