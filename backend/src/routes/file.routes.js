@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { uploadFile, downloadFile, listFiles, searchFiles, listVersions, revertVersion, shareFile, deleteFile } = require('../controllers/file.controller');
+const { uploadFile, downloadFile, listFiles, searchFiles, listVersions, revertVersion, updateFile, bulkAction, shareFile, deleteFile } = require('../controllers/file.controller');
 const { authenticateToken } = require('../middleware/auth.middleware');
 const { createUploadMiddleware, validateFile } = require('../middleware/file-upload.middleware');
 const telegramFileService = require('../services/telegram.service');
@@ -35,6 +35,12 @@ router.get('/search',
     searchFiles
 );
 
+// Bulk actions (delete/move) — must be before /:id routes
+router.post('/bulk',
+    authenticateToken,
+    bulkAction
+);
+
 router.get('/:id/versions',
     authenticateToken,
     listVersions
@@ -48,6 +54,11 @@ router.post('/:id/revert/:versionId',
 router.post('/:id/share',
     authenticateToken,
     shareFile
+);
+
+router.patch('/:id',
+    authenticateToken,
+    updateFile
 );
 
 router.delete('/:id',

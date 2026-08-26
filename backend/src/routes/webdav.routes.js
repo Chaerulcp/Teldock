@@ -243,7 +243,7 @@ router.put(/.*/, express.raw({ type: '*/*', limit: process.env.MAX_UPLOAD_BYTES 
         }
 
         await User.update(
-            { storageUsedBytes: sequelize.literal(`storage_used_bytes + ${buffer.length}`) },
+            { storageUsedBytes: sequelize.literal('`storageUsedBytes` + ' + buffer.length) },
             { where: { id: userId }, transaction: t }
         );
 
@@ -276,7 +276,7 @@ router.delete(/.*/, async (req, res) => {
             file.deletedAt = new Date();
             await file.save();
             await User.update(
-                { storageUsedBytes: sequelize.literal(`GREATEST(storage_used_bytes - ${Number(file.fileSize)}, 0)`) },
+                { storageUsedBytes: sequelize.literal('GREATEST(`storageUsedBytes` - ' + Number(file.fileSize) + ', 0)') },
                 { where: { id: userId } }
             );
             return res.status(204).end();

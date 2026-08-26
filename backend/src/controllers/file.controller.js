@@ -78,9 +78,9 @@ async function uploadFile(req, res) {
             }, { transaction: t });
         }
 
-        // Update user storage usage
+        // Update user storage usage (column is camelCase `storageUsedBytes`)
         await User.update(
-            { storageUsedBytes: sequelize.literal(`storage_used_bytes + ${Number(file.size)}`) },
+            { storageUsedBytes: sequelize.literal(`GREATEST(\`storageUsedBytes\` + ${Number(file.size)}, 0)`) },
             { where: { id: user.userId }, transaction: t }
         );
 
@@ -350,9 +350,9 @@ async function deleteFile(req, res) {
         file.deletedAt = new Date();
         await file.save();
 
-        // Update user storage
+        // Update user storage usage
         await User.update(
-            { storageUsedBytes: sequelize.literal(`storage_used_bytes - ${file.fileSize}`) },
+            { storageUsedBytes: sequelize.literal(`GREATEST(\`storageUsedBytes\` - ${Number(file.fileSize)}, 0)`) },
             { where: { id: req.user.userId } }
         );
 
@@ -491,6 +491,136 @@ async function revertVersion(req, res) {
     }
 }
 
+/**
+ * PATCH /api/files/:id
+ * Rename (displayFilename) and/or move (folderId) a file.
+ */
+async function updateFile(req, res) {
+    try {
+        const { id } = req.params;
+        const { displayFilename, folderId } = req.body;
+
+        const file = await File.findOne({
+            where: { id, userId: req.user.userId, isDeleted: false }
+        });
+        if (!file) {
+            return res.status(404).json({ success: false, error: 'File not found' });
+        }
+
+        // Validate destination folder if moving
+        if (folderId !== undefined) {
+            if (folderId === null || folderId === '' || folderId === 'root') {
+                file.folderId = null;
+            } else {
+                const folder = await Folder.findOne({ where: { id: folderId, userId: req.user.userId } });
+                if (!folder) {
+                    return res.status(404).json({ success: false, error: 'Destination folder not found' });
+                }
+                file.folderId = folderId;
+            }
+        }
+
+        // Rename
+        if (displayFilename !== undefined) {
+            const clean = sanitizeFilename(String(displayFilename).trim());
+            if (!clean) {
+                return res.status(400).json({ success: false, error: 'Invalid filename' });
+            }
+            file.displayFilename = clean;
+        }
+
+        await file.save();
+
+        res.json({ success: true, message: 'File updated', data: { file } });
+    } catch (error) {
+        console.error('❌ Update file failed:', error.message);
+        res.status(500).json({ success: false, error: 'Failed to update file' });
+    }
+}
+
+/**
+ * POST /api/files/bulk
+ * Perform a bulk action on multiple files: { action, fileIds[], folderId? }
+ * action: 'delete' | 'move'
+ */
+async function bulkAction(req, res) {
+    const t = await sequelize.transaction();
+    try {
+        const { action, fileIds, folderId } = req.body;
+
+        if (!Array.isArray(fileIds) || fileIds.length === 0) {
+            await t.rollback();
+            return res.status(400).json({ success: false, error: 'No files selected' });
+        }
+        if (!['delete', 'move'].includes(action)) {
+            await t.rollback();
+            return res.status(400).json({ success: false, error: 'Invalid action' });
+        }
+
+        const files = await File.findAll({
+            where: { id: { [require('sequelize').Op.in]: fileIds }, userId: req.user.userId, isDeleted: false },
+            include: [{ model: FilePart, as: 'parts' }],
+            transaction: t
+        });
+
+        if (files.length === 0) {
+            await t.rollback();
+            return res.status(404).json({ success: false, error: 'No matching files found' });
+        }
+
+        if (action === 'move') {
+            let destFolderId = null;
+            if (folderId && folderId !== 'root') {
+                const folder = await Folder.findOne({
+                    where: { id: folderId, userId: req.user.userId },
+                    transaction: t
+                });
+                if (!folder) {
+                    await t.rollback();
+                    return res.status(404).json({ success: false, error: 'Destination folder not found' });
+                }
+                destFolderId = folderId;
+            }
+            await File.update(
+                { folderId: destFolderId },
+                { where: { id: { [require('sequelize').Op.in]: files.map(f => f.id) }, userId: req.user.userId }, transaction: t }
+            );
+            await t.commit();
+            return res.json({ success: true, message: `Moved ${files.length} file(s)`, data: { count: files.length } });
+        }
+
+        // action === 'delete' (soft delete + best-effort Telegram cleanup)
+        let freedBytes = 0;
+        for (const file of files) {
+            freedBytes += Number(file.fileSize);
+            file.isDeleted = true;
+            file.deletedAt = new Date();
+            await file.save({ transaction: t });
+        }
+
+        await User.update(
+            { storageUsedBytes: sequelize.literal(`GREATEST(\`storageUsedBytes\` - ${freedBytes}, 0)`) },
+            { where: { id: req.user.userId }, transaction: t }
+        );
+
+        await t.commit();
+
+        // Delete from Telegram outside the DB transaction (best-effort)
+        for (const file of files) {
+            const parts = file.parts && file.parts.length > 0
+                ? file.parts
+                : [{ telegramChatId: file.telegramChatId, telegramMessageId: file.telegramMessageId }];
+            telegramStorage.deleteFile(req.user.userId, parts).catch(() => {});
+        }
+
+        res.json({ success: true, message: `Deleted ${files.length} file(s)`, data: { count: files.length } });
+    } catch (error) {
+        await t.rollback().catch(() => {});
+        console.error('❌ Bulk action failed:', error.message);
+        res.status(500).json({ success: false, error: 'Bulk action failed: ' + error.message });
+    }
+}
+
 module.exports = {
     uploadFile,
     downloadFile,
@@ -498,6 +628,8 @@ module.exports = {
     searchFiles,
     listVersions,
     revertVersion,
+    updateFile,
+    bulkAction,
     shareFile,
     deleteFile,
     authenticateToken // export for use in routes

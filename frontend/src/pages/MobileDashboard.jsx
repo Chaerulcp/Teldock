@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../store/auth-store';
-import { fileApi } from '../services/api';
+import { fileApi, folderApi } from '../services/api';
 
 function MobileDashboard() {
   const user = useAuthStore((state) => state.user);
@@ -17,100 +17,34 @@ function MobileDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
 
-  useEffect(() => {
-    loadContent();
-  }, [selectedFolder]);
-
-  const loadContent = async () => {
+  const loadContent = useCallback(async () => {
     setIsLoading(true);
-    
     try {
-      if (selectedFolder) {
-        const response = await fetch(`/api/files?folderId=${selectedFolder.id}&limit=100`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setFiles(data.data.files || []);
-          
-          const foldersResponse = await fetch(`/api/folders?parentFolderId=${selectedFolder.id}`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
-          });
-          
-          if (foldersResponse.ok) {
-            const folderData = await foldersResponse.json();
-            setFolders(folderData.data.folders || []);
-          }
-        }
-      } else {
-        // Load all files and folders at root
-        const filesRes = await fetch('/api/files?limit=100', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
-        });
-        
-        if (filesRes.ok) {
-          const data = await filesRes.json();
-          setFiles(data.data.files || []);
-        }
-
-        const foldersRes = await fetch('/api/folders?parentFolderId=null', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
-        });
-        
-        if (foldersRes.ok) {
-          const folderData = await foldersRes.json();
-          setFolders(folderData.data.folders || []);
-        }
-      }
-      
       if (searchQuery.trim()) {
-        const searchRes = await fetch(`/api/files/search?q=${searchQuery}&limit=50`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
-        });
-        
-        if (searchRes.ok) {
-          const searchData = await searchRes.json();
-          setFiles(searchData.data.files || []);
-        }
+        const res = await fileApi.search(searchQuery, { limit: 50 });
+        setFiles(res.data.data.files || []);
+        setFolders([]);
+        return;
       }
-      
+
+      const parentId = selectedFolder?.id ?? null;
+      const [filesRes, foldersRes] = await Promise.all([
+        fileApi.list({ limit: 100, folderId: parentId || undefined }),
+        folderApi.list(parentId),
+      ]);
+      setFiles(filesRes.data.data.files || []);
+      setFolders(foldersRes.data.data.folders || []);
     } catch (error) {
       console.error('Failed to load content:', error);
       toast.error('Failed to load files');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedFolder, searchQuery]);
 
-  // Touch gesture handlers
-  const handleSwipe = useCallback((direction, item) => {
-    switch (direction) {
-      case 'left':
-        // Favorite/Star toggle
-        toggleFavorite(item);
-        break;
-      case 'right':
-        // Delete confirmation
-        showDeleteConfirmation(item);
-        break;
-      case 'down':
-        // Show quick actions
-        showQuickActions(item);
-        break;
-    }
-  }, []);
-
-  const toggleFavorite = async (item) => {
-    // Implement favorite toggle logic
-    toast.success(`${item.isFavorited ? 'Removed from favorites' : 'Added to favorites'}`);
-  };
-
-  const showDeleteConfirmation = (item) => {
-    if (confirm(`Delete "${item.displayFilename}"?`)) {
-      deleteFile(item.id);
-    }
-  };
+  useEffect(() => {
+    loadContent();
+  }, [loadContent]);
 
   const deleteFile = async (fileId) => {
     try {
@@ -120,15 +54,6 @@ function MobileDashboard() {
     } catch (error) {
       toast.error('Failed to delete file');
     }
-  };
-
-  const showQuickActions = (item) => {
-    // Show menu with download, share, rename options
-    showToast('Quick actions menu coming soon');
-  };
-
-  const showToast = (message) => {
-    toast.info(message);
   };
 
   const getFileIcon = (mimeType) => {
@@ -193,17 +118,15 @@ function MobileDashboard() {
         </div>
 
         {/* Search Bar (on mobile) */}
-        {selectedFolder && (
-          <div className="px-4 pb-3">
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            />
-          </div>
-        )}
+        <div className="px-4 pb-3">
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          />
+        </div>
       </header>
 
       {/* Main Content */}
@@ -212,7 +135,7 @@ function MobileDashboard() {
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
           </div>
-        ) : selectedFolder ? (
+        ) : (
           <>
             {/* Folders Section */}
             {folders.length > 0 && (
@@ -281,61 +204,6 @@ function MobileDashboard() {
               </div>
             </section>
           </>
-        ) : (
-          /* Root View - Quick Actions */
-          <div className="space-y-4">
-            {/* Upload Button */}
-            <button className="w-full py-4 bg-primary-600 text-white rounded-lg font-semibold flex items-center justify-center space-x-2 shadow-lg hover:bg-primary-700 transition-colors">
-              <UploadCloud className="w-6 h-6" />
-              <span>Quick Upload</span>
-            </button>
-
-            {/* Quick Access Folders */}
-            <section>
-              <h2 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Recent Folders</h2>
-              <div className="space-y-2">
-                {[
-                  { name: 'Documents', count: 12, icon: <FileText /> },
-                  { name: 'Images', count: 45, icon: <ImageIcon /> },
-                  { name: 'Videos', count: 8, icon: <Video /> },
-                  { name: 'Downloads', count: 23, icon: <Move /> }
-                ].map((folder, index) => (
-                  <div
-                    key={index}
-                    onClick={() => navigateToFolder({ name: folder.name, id: `temp-${index}` })}
-                    className="flex items-center p-3 bg-white border border-gray-200 rounded-lg active:bg-gray-50 cursor-pointer"
-                  >
-                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-primary-600 mr-3">
-                      {folder.icon}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">{folder.name}</p>
-                      <p className="text-xs text-gray-500">{folder.count} items</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* Recent Files */}
-            <section>
-              <h2 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Recent Files</h2>
-              <div className="space-y-2">
-                {[1, 2, 3].map((_, index) => (
-                  <div key={index} className="flex items-center p-3 bg-white border border-gray-200 rounded-lg">
-                    <FileText className="w-10 h-10 text-blue-500 mr-3" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">File {index + 1}.pdf</p>
-                      <p className="text-xs text-gray-500">2.5 MB • 2 hours ago</p>
-                    </div>
-                    <button className="p-2 hover:bg-gray-100 rounded">
-                      <MoreVertical className="w-5 h-5 text-gray-400" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
         )}
       </main>
 

@@ -85,6 +85,9 @@ export const fileApi = {
   share: (id, data) => api.post(`/files/${id}/share`, data),
   versions: (id) => api.get(`/files/${id}/versions`),
   revert: (id, versionId) => api.post(`/files/${id}/revert/${versionId}`),
+  rename: (id, displayFilename) => api.patch(`/files/${id}`, { displayFilename }),
+  move: (id, folderId) => api.patch(`/files/${id}`, { folderId }),
+  bulk: (action, fileIds, folderId) => api.post('/files/bulk', { action, fileIds, folderId }),
 };
 
 // Folder API calls
