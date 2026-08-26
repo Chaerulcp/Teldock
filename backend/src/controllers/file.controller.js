@@ -19,20 +19,12 @@ async function uploadFile(req, res) {
 
         console.log(`📤 Starting upload for ${file.originalname} (${file.size} bytes)`);
 
-        // Check storage quota
+        // Verify user exists (usage is tracked for stats, not enforced as a fixed quota —
+        // capacity depends on the user's own Telegram account/channel)
         const dbUser = await User.findByPk(user.userId, { transaction: t });
         if (!dbUser) {
             await t.rollback();
             return res.status(404).json({ success: false, error: 'User not found' });
-        }
-
-        const remainingStorage = Number(dbUser.storageQuotaBytes) - Number(dbUser.storageUsedBytes);
-        if (file.size > remainingStorage) {
-            await t.rollback();
-            return res.status(403).json({
-                success: false,
-                error: 'Insufficient storage quota. Please upgrade or delete some files.'
-            });
         }
 
         // Find target folder

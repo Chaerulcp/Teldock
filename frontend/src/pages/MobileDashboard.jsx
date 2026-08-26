@@ -423,7 +423,7 @@ function MobileDashboard() {
 
             <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
               <div className="text-xs text-gray-500">
-                Storage: {(user?.storageUsedBytes / 1024 / 1024).toFixed(0)} MB / {(user?.storageQuotaBytes / 1024 / 1024 / 1024).toFixed(2)} GB
+                Storage used: {((user?.storageUsedBytes || 0) / 1024 / 1024).toFixed(0)} MB
               </div>
             </div>
           </div>

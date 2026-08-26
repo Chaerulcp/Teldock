@@ -38,11 +38,14 @@ const User = sequelize.define('User', {
     },
     storageQuotaBytes: {
         type: DataTypes.BIGINT,
-        defaultValue: 53687091200 // 50GB default
+        allowNull: true,
+        defaultValue: null,
+        comment: 'Optional soft cap in bytes. Null = no fixed quota (capacity depends on Telegram).'
     },
     storageUsedBytes: {
         type: DataTypes.BIGINT,
-        defaultValue: 0
+        defaultValue: 0,
+        comment: 'Approximate bytes uploaded, tracked for stats only.'
     },
     premiumUntil: {
         type: DataTypes.DATE,
@@ -66,9 +69,10 @@ const User = sequelize.define('User', {
 });
 
 /**
- * Helper method to check storage quota
+ * Helper: check an optional soft quota. Returns true when no quota is set.
  */
 User.prototype.canUpload = function(fileSize) {
+    if (this.storageQuotaBytes == null) return true;
     const remaining = this.storageQuotaBytes - this.storageUsedBytes;
     return fileSize <= remaining;
 };

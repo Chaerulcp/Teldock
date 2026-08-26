@@ -11,7 +11,7 @@ router.use(authenticateToken);
  * POST /api/user/telegram/connect
  * Connect new Telegram bot & storage channel
  */
-router.post('/connect', async (req, res) => {
+router.post('/telegram/connect', async (req, res) => {
     try {
         const userId = req.user.userId;
         const { botToken, chatId, chatType = 'channel', username } = req.body;
@@ -64,7 +64,7 @@ router.post('/connect', async (req, res) => {
  * PUT /api/user/telegram/config
  * Update existing Telegram config
  */
-router.put('/config', async (req, res) => {
+router.put('/telegram/config', async (req, res) => {
     try {
         const userId = req.user.userId;
         const { botToken, chatId, chatType, username } = req.body;
@@ -124,7 +124,7 @@ router.put('/config', async (req, res) => {
  * GET /api/user/telegram/status
  * Get connection status
  */
-router.get('/status', async (req, res) => {
+router.get('/telegram/status', async (req, res) => {
     try {
         const config = await TelegramConfig.findByUser(req.user.userId);
 
@@ -178,7 +178,7 @@ router.get('/status', async (req, res) => {
  * DELETE /api/user/telegram/unlink
  * Disconnect Telegram
  */
-router.delete('/unlink', async (req, res) => {
+router.delete('/telegram/unlink', async (req, res) => {
     try {
         await TelegramConfig.disableConfig(req.user.userId);
 

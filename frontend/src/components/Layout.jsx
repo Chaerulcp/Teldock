@@ -1,9 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Outlet, useNavigate, NavLink } from 'react-router-dom';
-import { File, LogOut, Cloud, Settings, Smartphone, Moon, Sun, HardDrive } from 'lucide-react';
+import { Outlet, useNavigate, NavLink, Link } from 'react-router-dom';
+import { File, LogOut, Cloud, Settings, Smartphone, Moon, Sun, HardDrive, AlertTriangle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../store/auth-store';
 import { useThemeStore } from '../store/theme-store';
+import { userApi } from '../services/api';
+
+function formatBytes(bytes) {
+  const b = Number(bytes || 0);
+  if (b === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(b) / Math.log(k));
+  return `${parseFloat((b / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
 
 function Layout() {
   const navigate = useNavigate();
@@ -11,14 +21,22 @@ function Layout() {
   const logout = useAuthStore((state) => state.logout);
   const theme = useThemeStore((state) => state.theme);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
-  const [storageUsed, setStorageUsed] = useState(0);
+  const [tgConnected, setTgConnected] = useState(null); // null = loading
 
   useEffect(() => {
-    if (user) {
-      const percentage = ((user.storageUsedBytes / user.storageQuotaBytes) * 100).toFixed(1);
-      setStorageUsed(parseFloat(percentage));
-    }
-  }, [user]);
+    let active = true;
+    userApi
+      .telegramStatus()
+      .then((res) => {
+        if (active) setTgConnected(!!res.data?.data?.isConnected);
+      })
+      .catch(() => {
+        if (active) setTgConnected(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -26,8 +44,7 @@ function Layout() {
     navigate('/login');
   };
 
-  const usedMB = ((user?.storageUsedBytes || 0) / 1024 / 1024).toFixed(0);
-  const quotaGB = ((user?.storageQuotaBytes || 0) / 1024 / 1024 / 1024).toFixed(0);
+  const usedStorage = formatBytes(user?.storageUsedBytes);
 
   const navItems = [
     { to: '/dashboard', icon: File, label: 'All Files', end: true },
@@ -65,21 +82,34 @@ function Layout() {
         </div>
 
         <div className="mt-auto p-5 space-y-4">
-          {/* Storage widget */}
-          <div className="p-4 rounded-2xl bg-ink-50 dark:bg-ink-950/60 border border-ink-100 dark:border-ink-800">
-            <div className="flex items-center gap-2 mb-3">
-              <HardDrive className="w-4 h-4 text-primary-500" />
-              <span className="text-xs font-semibold text-ink-700 dark:text-ink-300">Storage</span>
-              <span className="ml-auto text-xs font-mono text-ink-400">{storageUsed}%</span>
+          {/* Telegram connection / storage widget */}
+          {tgConnected === false ? (
+            <Link
+              to="/dashboard/settings"
+              className="block p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 hover:border-amber-300 dark:hover:border-amber-700 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Telegram not connected</span>
+              </div>
+              <p className="mt-1.5 text-xs text-amber-700/80 dark:text-amber-400/80 leading-relaxed">
+                Connect a bot in Settings before uploading files.
+              </p>
+            </Link>
+          ) : (
+            <div className="p-4 rounded-2xl bg-ink-50 dark:bg-ink-950/60 border border-ink-100 dark:border-ink-800">
+              <div className="flex items-center gap-2 mb-3">
+                <HardDrive className="w-4 h-4 text-primary-500" />
+                <span className="text-xs font-semibold text-ink-700 dark:text-ink-300">Storage used</span>
+                <span className="ml-auto text-xs font-mono text-ink-400">
+                  {tgConnected === null ? '…' : usedStorage}
+                </span>
+              </div>
+              <p className="text-xs text-ink-400 leading-relaxed">
+                Backed by your Telegram channel — capacity depends on Telegram, not a fixed quota.
+              </p>
             </div>
-            <div className="w-full bg-ink-200 dark:bg-ink-800 rounded-full h-1.5 overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${storageUsed > 80 ? 'bg-red-500' : storageUsed > 60 ? 'bg-amber-500' : 'bg-primary-500'}`}
-                style={{ width: `${Math.min(storageUsed, 100)}%` }}
-              />
-            </div>
-            <p className="mt-2 text-xs text-ink-400 font-mono">{usedMB} MB / {quotaGB} GB</p>
-          </div>
+          )}
 
           {/* User + actions */}
           <div className="flex items-center gap-2">
