@@ -69,9 +69,14 @@ export const authApi = {
 
 // File API calls
 export const fileApi = {
-  upload: (formData) => 
+  upload: (formData, onUploadProgress) =>
     api.post('/files/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress,
+      // Large files are chunked server-side; allow long uploads
+      timeout: 0,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
     }),
   list: (params) => api.get('/files', { params }),
   search: (q, params) => api.get('/files/search', { params: { q, ...params } }),
@@ -97,6 +102,13 @@ export const userApi = {
   connectTelegram: (data) => api.post('/user/telegram/connect', data),
   updateTelegram: (data) => api.put('/user/telegram/config', data),
   unlinkTelegram: () => api.delete('/user/telegram/unlink'),
+};
+
+// Multi-bot pool API calls
+export const botApi = {
+  list: () => api.get('/bots'),
+  add: (token) => api.post('/bots', { token }),
+  remove: (id) => api.delete(`/bots/${id}`),
 };
 
 export default api;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { UploadCloud, FileText, Image as ImageIcon, Video, Music, Download, Share2, MoreHorizontal, Folder } from 'lucide-react';
+import { UploadCloud, FileText, Image as ImageIcon, Video, Music, Download, Share2, MoreHorizontal, Folder, Lock } from 'lucide-react';
 import { fileApi } from '../services/api';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
@@ -9,7 +9,9 @@ function Dashboard() {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
+  const [encryptUploads, setEncryptUploads] = useState(false);
 
   useEffect(() => {
     loadFiles();
@@ -30,12 +32,18 @@ function Dashboard() {
     if (!file) return;
 
     setUploading(true);
+    setUploadProgress(0);
     const formData = new FormData();
     formData.append('file', file);
     formData.append('description', `Uploaded ${file.name}`);
+    if (encryptUploads) formData.append('encrypt', 'true');
 
     try {
-      await fileApi.upload(formData);
+      await fileApi.upload(formData, (evt) => {
+        if (evt.total) {
+          setUploadProgress(Math.round((evt.loaded / evt.total) * 100));
+        }
+      });
       toast.success(`File "${file.name}" uploaded successfully!`);
       loadFiles();
     } catch (error) {
@@ -43,6 +51,7 @@ function Dashboard() {
       toast.error(error.response?.data?.error || 'Upload failed');
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -136,12 +145,28 @@ function Dashboard() {
           <p className="text-lg font-medium text-gray-900">
             Drag & drop files here or <label htmlFor="file-upload" className="text-primary-600 cursor-pointer hover:text-primary-500">browse</label>
           </p>
-          <p className="text-sm text-gray-500">Support for images, videos, documents up to 50MB</p>
-          
+          <p className="text-sm text-gray-500">Large files are automatically split into parts — no 50MB limit</p>
+
+          <label className="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={encryptUploads}
+              onChange={(e) => setEncryptUploads(e.target.checked)}
+              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            />
+            <Lock className="w-4 h-4" />
+            Encrypt this upload (AES-256)
+          </label>
+
           {uploading && (
             <div className="mt-4 p-3 bg-primary-50 rounded-lg">
-              <div className="animate-spin h-6 w-6 border-2 border-primary-600 border-t-transparent rounded-full mx-auto"></div>
-              <p className="text-sm text-primary-700 mt-2">Uploading...</p>
+              <div className="w-full bg-primary-100 rounded-full h-2 overflow-hidden">
+                <div
+                  className="h-2 bg-primary-600 transition-all"
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+              <p className="text-sm text-primary-700 mt-2">Uploading… {uploadProgress}%</p>
             </div>
           )}
         </div>
@@ -182,6 +207,14 @@ function Dashboard() {
                       <div className="flex items-center">
                         {getFileIcon(file.mimeType)}
                         <span className="ml-3 text-sm font-medium text-gray-900 truncate max-w-md">{file.displayFilename}</span>
+                        {file.isEncrypted && (
+                          <Lock className="ml-2 w-3.5 h-3.5 text-gray-400" title="Encrypted" />
+                        )}
+                        {file.isChunked && (
+                          <span className="ml-2 px-1.5 py-0.5 text-[10px] font-semibold text-primary-700 bg-primary-100 rounded" title={`${file.partCount} parts`}>
+                            {file.partCount}×
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

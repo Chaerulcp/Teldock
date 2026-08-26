@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, User, Cloud, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Settings as SettingsIcon, User, Cloud, Lock, CheckCircle2, AlertCircle, Bot, Trash2, Plus } from 'lucide-react';
 import { useAuthStore } from '../store/auth-store';
+import { botApi } from '../services/api';
 import { toast } from 'react-toastify';
 
 function Settings() {
@@ -33,17 +34,17 @@ function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Settings</h1>
-          <p className="text-gray-600">Manage your account preferences</p>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Settings</h1>
+          <p className="text-gray-600 dark:text-gray-400">Manage your account preferences</p>
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="flex border-b border-gray-200">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+          <div className="flex border-b border-gray-200 dark:border-gray-700">
             <button
               onClick={() => setActiveTab('telegram')}
               className={`flex items-center px-6 py-4 font-medium transition-colors ${
@@ -54,6 +55,18 @@ function Settings() {
             >
               <Cloud className="w-5 h-5 mr-2" />
               Telegram Integration
+            </button>
+
+            <button
+              onClick={() => setActiveTab('bots')}
+              className={`flex items-center px-6 py-4 font-medium transition-colors ${
+                activeTab === 'bots'
+                  ? 'text-primary-600 border-b-2 border-primary-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Bot className="w-5 h-5 mr-2" />
+              Bot Pool
             </button>
             
             <button
@@ -78,6 +91,8 @@ function Settings() {
               />
             )}
 
+            {activeTab === 'bots' && <BotPoolTab />}
+
             {activeTab === 'profile' && (
               <div className="text-center py-12 text-gray-500">
                 <User className="mx-auto w-12 h-12 mb-4 text-gray-300" />
@@ -87,6 +102,123 @@ function Settings() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Bot Pool Tab - manage multiple bot tokens for faster parallel transfers
+function BotPoolTab() {
+  const [bots, setBots] = useState([]);
+  const [token, setToken] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadBots();
+  }, []);
+
+  const loadBots = async () => {
+    try {
+      const res = await botApi.list();
+      setBots(res.data.data.bots || []);
+    } catch (error) {
+      console.error('Failed to load bots:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addBot = async () => {
+    if (!token.trim()) return;
+    setAdding(true);
+    try {
+      await botApi.add(token.trim());
+      toast.success('Bot added to pool');
+      setToken('');
+      loadBots();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to add bot');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const removeBot = async (id) => {
+    if (!confirm('Remove this bot from the pool?')) return;
+    try {
+      await botApi.remove(id);
+      toast.success('Bot removed');
+      loadBots();
+    } catch (error) {
+      toast.error('Failed to remove bot');
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+        <div className="flex items-start">
+          <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+          <div>
+            <h3 className="font-semibold text-blue-900 dark:text-blue-200 mb-1">Multi-Bot Pool</h3>
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              Add multiple bot tokens to spread uploads and downloads across bots for higher speed.
+              Each bot must be an admin of your storage channel. 5–8 bots is a good target.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder="Bot token from @BotFather"
+          className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+        />
+        <button
+          onClick={addBot}
+          disabled={adding || !token.trim()}
+          className="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50"
+        >
+          <Plus className="w-4 h-4" />
+          {adding ? 'Adding…' : 'Add Bot'}
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        </div>
+      ) : bots.length === 0 ? (
+        <p className="text-center text-gray-500 py-8">No bots in your pool yet.</p>
+      ) : (
+        <ul className="divide-y divide-gray-200 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg">
+          {bots.map((bot) => (
+            <li key={bot.id} className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-3">
+                <Bot className="w-5 h-5 text-primary-600" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {bot.botUsername ? `@${bot.botUsername}` : `Bot ${bot.botId}`}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {bot.isActive ? 'Active' : 'Inactive'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => removeBot(bot.id)}
+                className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 p-2 rounded"
+                title="Remove"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

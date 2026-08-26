@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { useEffect } from 'react'
 import App from './App.jsx'
 import { useAuthStore } from './store/auth-store.js'
+import { useThemeStore } from './store/theme-store.js'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import './index.css'
@@ -11,11 +12,12 @@ import './index.css'
 // App component with initialization effect wrapper
 const AppWithInit = () => {
   const initialize = useAuthStore(state => state.initialize);
+  const initTheme = useThemeStore(state => state.initTheme);
   
   useEffect(() => {
-    console.log('Initializing auth...');
+    initTheme();
     initialize();
-  }, [initialize]);
+  }, [initialize, initTheme]);
   
   return <App />;
 }
