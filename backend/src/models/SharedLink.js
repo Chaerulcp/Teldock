@@ -27,7 +27,7 @@ const SharedLink = sequelize.define('SharedLink', {
         onDelete: 'CASCADE'
     },
     token: {
-        type: DataTypes.STRING(64),
+        type: DataTypes.STRING(512),
         allowNull: false,
         unique: true,
         comment: 'JWT-based access token'
@@ -208,7 +208,8 @@ SharedLink.validateToken = async function(token) {
 
 SharedLink.getLinksForUser = async function(userId, options = {}) {
     const { page = 1, limit = 20 } = options;
-    
+    const File = require('./File');
+
     const offset = (page - 1) * limit;
     
     const result = await SharedLink.findAndCountAll({
@@ -219,11 +220,8 @@ SharedLink.getLinksForUser = async function(userId, options = {}) {
         include: [{
             model: File,
             as: 'file',
-            attributes: ['id', 'originalFilename', 'mimeType', 'fileSize']
-        }],
-        attributes: {
-            exclude: ['token']
-        }
+            attributes: ['id', 'originalFilename', 'displayFilename', 'mimeType', 'fileSize']
+        }]
     });
     
     return {

@@ -9,6 +9,7 @@
     "migrate": "node scripts/migrate.js",
     "migrate:chunked": "node scripts/migrate-chunked-storage.js",
     "migrate:drop-quota": "node scripts/migrate-drop-quota.js",
+    "migrate:widen-share-token": "node scripts/migrate-widen-share-token.js",
     "test-auth": "node tests/test-auth.js",
     "test-db": "node scripts/test-database.js",
     "generate-previews": "node scripts/generate-previews.js",
