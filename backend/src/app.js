@@ -13,6 +13,8 @@ const previewRoutes = require('./routes/preview.routes'); // New
 const botRoutes = require('./routes/bot.routes'); // Multi-bot pool
 const shareRoutes = require('./routes/share.routes'); // Share management
 const statsRoutes = require('./routes/stats.routes'); // Storage stats
+const tagRoutes = require('./routes/tag.routes'); // Tags
+const smartFolderRoutes = require('./routes/smart-folder.routes'); // Saved filters
 const webdavRouter = require('./routes/webdav.routes'); // Rclone/WebDAV
 const { testConnection } = require('./config/database');
 const RealTimeSyncService = require('./services/realtime-sync.service');
@@ -75,6 +77,8 @@ app.use('/api/previews', previewRoutes); // Add preview routes
 app.use('/api/bots', botRoutes); // Multi-bot token pool
 app.use('/api/shares', shareRoutes); // Share management
 app.use('/api/stats', statsRoutes); // Storage stats
+app.use('/api/tags', tagRoutes); // Tags
+app.use('/api/smart-folders', smartFolderRoutes); // Saved filters
 
 // Error handling middleware
 app.use((err, req, res, next) => {
