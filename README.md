@@ -1,467 +1,398 @@
-# 🔸 Telegram Cloud Storage Web App 🚀
+# Telegram Cloud Storage
 
-A full-stack cloud storage solution powered by Telegram Bot API and built with React + Node.js. Upload, download, and share files using Telegram's infrastructure as your backend storage.
+A full-stack cloud storage application that uses the **Telegram Bot API** as its file storage backend. Files are streamed to a private Telegram chat/channel, while the application database stores only lightweight metadata (filenames, MIME types, sizes, Telegram references, sharing tokens). This keeps local/VPS disk usage minimal while leveraging Telegram's infrastructure for the actual file bytes.
 
-![Status](https://img.shields.io/badge/Phase-4%20Complete-brightgreen)
-![Node.js](https://img.shields.io/badge/Node.js-22.x-blue)
-![React](https://img.shields.io/badge/React-18.x-purple)
-![MySQL](https://img.shields.io/badge/Database-MySQL%2FMariaDB-lightgrey)
+![Node.js](https://img.shields.io/badge/Node.js-22.x-339933?logo=node.js&logoColor=white)
+![React](https://img.shields.io/badge/React-18.x-61DAFB?logo=react&logoColor=black)
+![Express](https://img.shields.io/badge/Express-5.x-000000?logo=express&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL%2FMariaDB-8.0+-4479A1?logo=mysql&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ---
 
-## ✨ Features
+## Table of Contents
 
-### 🎨 Frontend (React SPA) ✅ COMPLETE
-- Beautiful, responsive UI with TailwindCSS
-- Drag-and-drop file upload
-- Real-time upload progress
-- File preview & sharing
-- Toast notifications
-- Dark mode support (ready)
-- Mobile-friendly design
-
-### 🔐 Authentication System
-- Email/Password registration
-- Telegram ID authentication support  
-- JWT access tokens (15 minutes expiry)
-- Refresh tokens (7 days validity)
-- Protected route enforcement
-
-### 📁 File Management
-- Upload files up to 50MB to Telegram
-- Stream large files efficiently (memory-safe)
-- Hierarchical folder organization
-- Download files from Telegram CDN
-- Create secure shared links with:
-  - Expiration dates
-  - Download limits
-  - Password protection
-- Soft delete support (recoverable)
-
-### 🛡️ Security
-- Multi-layer security architecture
-- Rate limiting (100 req/15min general)
-- Input validation & sanitization
-- SQL injection prevention
-- Filename security (path traversal blocked)
-- Storage quota enforcement
-- Download tracking & analytics
-
-### 🚀 Performance
-- Streaming file transfers
-- Automatic retry logic (exponential backoff)
-- Optimized database indexes
-- Connection pooling
-- Pagination on list operations
-
+- [Overview](#overview)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [Available Scripts](#available-scripts)
+- [API Reference](#api-reference)
+- [Database Schema](#database-schema)
+- [Security](#security)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## 🏗️ Architecture Overview
+## Overview
+
+**How it works:**
+
+1. A file is uploaded through the web interface.
+2. The backend streams the file to a Telegram chat/channel via the Bot API (`sendDocument`).
+3. Telegram returns metadata (`file_id`, `message_id`, etc.).
+4. The database stores only that metadata plus ownership and sharing info — never the raw file.
+5. On download, the backend resolves the Telegram `file_path` and redirects to the Telegram CDN so bytes stream directly to the client.
+
+This design avoids storing large files on the server disk and offloads bandwidth to Telegram's CDN.
+
+---
+
+## Features
+
+**Authentication**
+- Email/password registration and login
+- Optional Telegram ID based accounts
+- JWT access tokens (short-lived) with refresh tokens
+- Protected routes with bearer-token middleware
+
+**File management**
+- Upload files (up to 50 MB per file via the standard Bot API) with streaming
+- List files with pagination, sorting, and folder filtering
+- Filename-based search (`/api/files/search`)
+- Download via redirect to the Telegram CDN
+- Soft delete (recoverable) with per-user storage quota accounting
+- File version history with revert support
+
+**Folders**
+- Hierarchical folder tree (create, rename, delete)
+- Path-based lookups; deleting a folder detaches contained files to the root
+
+**Sharing**
+- Signed shared links with optional expiration, download limits, and password protection
+- Public link endpoint that requires no authentication
+
+**Per-user Telegram configuration**
+- Each user can connect their own bot token + storage chat via the Settings page
+- Credentials are encrypted at rest (AES-256-CBC)
+
+**Media previews**
+- On-demand image preview generation (multiple sizes, WebP) using `sharp`
+- Video thumbnail extraction scaffolding using `ffmpeg` (requires ffmpeg installed)
+
+**Real-time & background processing**
+- WebSocket channel (`socket.io`) for per-user real-time events
+- Optional BullMQ + Redis queue for preview generation
+
+---
+
+## Architecture
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   React SPA     │────▶│  Node.js Server  │────▶│   Telegram Bot  │
-│   (Phase 4)     │     │   Express API    │     │   API / Channel │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-                              │        │
-                              ▼        ▼
-                        ┌─────────────┐  ┌──────────────┐
-                        │   MySQL DB  │  │   Redis      │
-                        │             │  │   (Future)   │
-                        └─────────────┘  └──────────────┘
+┌──────────────────┐     ┌───────────────────────┐     ┌──────────────────────┐
+│   React SPA      │ ──▶ │   Express REST API     │ ──▶ │   Telegram Bot API    │
+│   (Vite + TW)    │ ◀── │   (Node.js)            │ ◀── │   Chat / Channel      │
+└──────────────────┘     └───────────┬───────────┘     └──────────────────────┘
+        ▲                            │
+        │  WebSocket (socket.io)     ├──────────────┐
+        └────────────────────────────┤              │
+                                      ▼              ▼
+                              ┌──────────────┐  ┌──────────────┐
+                              │  MySQL /     │  │  Redis        │
+                              │  MariaDB     │  │  (optional,   │
+                              │  (Sequelize) │  │  preview jobs)│
+                              └──────────────┘  └──────────────┘
 ```
 
-**Full-Stack Implementation**: Production-ready  
-**Frontend**: http://localhost:3000 ✅ Running  
-**Backend**: http://localhost:3001/api ✅ Running  
+The backend is layered: **routes → controllers → services → models**. The Telegram gateway, metadata/database layer, and file streaming logic are kept in separate service modules.
 
 ---
 
-## 📦 Tech Stack
+## Tech Stack
 
-| Component | Technology | Version |
-|-----------|------------|---------|
-| **Backend** | Node.js | 22.x |
-| **Framework** | Express.js | 5.x |
-| **Database** | MySQL/MariaDB | 8.0+ |
-| **ORM** | Sequelize | 6.37.8 |
-| **Auth** | JSON Web Tokens | Latest |
-| **Security** | Helmet/CORS | Latest |
-| **File Handling** | Multer/Form-Data | 2.x |
-| **Telegram** | Telegraf.js | 4.x |
+### Backend
+| Purpose | Technology |
+|---------|------------|
+| Runtime | Node.js 22.x |
+| Web framework | Express 5 |
+| Database | MySQL / MariaDB |
+| ORM | Sequelize 6 |
+| Auth | jsonwebtoken (JWT) + bcryptjs |
+| Security | Helmet, CORS, express-rate-limit |
+| Uploads | Multer (memory storage) + form-data |
+| Real-time | socket.io |
+| Queue (optional) | BullMQ + ioredis |
+| Media | sharp (images), fluent-ffmpeg (video) |
+
+### Frontend
+| Purpose | Technology |
+|---------|------------|
+| Framework | React 18 |
+| Build tool | Vite 5 |
+| Styling | Tailwind CSS 3 |
+| State | Zustand |
+| HTTP | Axios |
+| Routing | React Router 6 |
+| Icons | lucide-react |
+| Notifications | react-toastify |
 
 ---
 
-## 🚀 Getting Started
+## Project Structure
+
+```
+tele-storage-app/
+├── backend/
+│   ├── src/
+│   │   ├── config/          # Database & Telegram configuration
+│   │   ├── controllers/     # auth, file, folder request handlers
+│   │   ├── middleware/       # auth, upload, telegram-gateway
+│   │   ├── models/          # Sequelize models + associations (index.js)
+│   │   ├── routes/          # auth, file, folder, user, preview routes
+│   │   ├── services/        # telegram, jwt, versioning, previews, queue, realtime
+│   │   └── app.js           # Express app + server bootstrap
+│   ├── scripts/             # migrate.js and table migration scripts
+│   ├── tests/               # standalone test scripts
+│   ├── .env.example
+│   └── package.json
+│
+├── frontend/
+│   ├── src/
+│   │   ├── components/      # Layout, VersionHistory
+│   │   ├── pages/           # Login, Register, Dashboard, MobileDashboard, Settings
+│   │   ├── services/        # api.js (Axios client + interceptors)
+│   │   ├── store/           # auth-store.js (Zustand)
+│   │   └── App.jsx / main.jsx
+│   ├── vite.config.js       # dev server + /api proxy to backend
+│   └── package.json
+│
+├── README.md
+├── QUICK_START.md
+└── LICENSE
+```
+
+---
+
+## Getting Started
 
 ### Prerequisites
 
-- **Node.js** v20 or higher
-- **MySQL** or **MariaDB** server
-- **Git** for version control
+- Node.js 20+ (22.x recommended)
+- MySQL or MariaDB (8.0+)
+- Optional: Redis (for the preview queue), `ffmpeg` (for video thumbnails)
+- A Telegram bot token from [@BotFather](https://t.me/BotFather) and a storage chat/channel ID (only needed for real uploads)
 
-### Installation Steps
+### 1. Clone
 
-#### 1. Clone Repository
 ```bash
-git clone <repository-url>
+git clone https://github.com/Chaerulcp/tele-storage-app.git
 cd tele-storage-app
 ```
 
-#### 2. Install Dependencies
+### 2. Backend setup
+
 ```bash
 cd backend
 npm install
+cp .env.example .env      # then edit .env with your values
+npm run migrate           # creates all database tables
+npm run dev               # starts API on http://localhost:3001
 ```
 
-#### 3. Configure Environment
-Create `.env` file in `backend/`:
+### 3. Frontend setup
+
+In a separate terminal:
+
 ```bash
-# Server Configuration
-NODE_ENV=development
-PORT=3001
-
-# Database
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=tele_storage_db
-DB_USER=root
-DB_PASSWORD=your_mysql_password
-
-# JWT Secrets
-JWT_SECRET=change-this-to-random-string-in-production
-JWT_EXPIRE=15m
-REFRESH_TOKEN_SECRET=another-secret-key
-REFRESH_TOKEN_EXPIRE=7d
-
-# Telegram (Optional for file upload)
-TELEGRAM_BOT_TOKEN=your-bot-token-here
-TELEGRAM_STORAGE_CHAT_ID=-100xxxxxxxxxx
+cd frontend
+npm install
+npm run dev               # starts SPA on http://localhost:3000
 ```
 
-#### 4. Setup Database
-```bash
-# Run migrations to create tables
-npm run migrate
+The Vite dev server proxies `/api` requests to the backend at `http://localhost:3001`, so no extra CORS setup is needed in development.
 
-# Verify database structure
-npm run test-db
-```
+### 4. Open the app
 
-#### 5. Start Server
-```bash
-# Development mode (with auto-reload)
-npm run dev
-
-# Production mode
-npm start
-```
-
-Server will be available at: `http://localhost:3001/api`
+Navigate to **http://localhost:3000**, register an account, then open **Settings** to connect your Telegram bot before uploading files.
 
 ---
 
-## 🧪 Testing the Application
+## Environment Variables
 
-### Test Credentials
+Configure these in `backend/.env` (see `backend/.env.example`):
 
-You can use these test accounts:
+| Variable | Description |
+|----------|-------------|
+| `NODE_ENV` | `development` or `production` |
+| `PORT` | Backend port (default `3001`) |
+| `DB_HOST` / `DB_PORT` | Database host and port |
+| `DB_NAME` | Database name (e.g. `tele_storage_db`) |
+| `DB_USER` / `DB_PASSWORD` | Database credentials |
+| `JWT_SECRET` | Secret for access tokens |
+| `JWT_EXPIRE` | Access token lifetime (e.g. `15m`) |
+| `REFRESH_TOKEN_SECRET` | Secret for refresh tokens |
+| `REFRESH_TOKEN_EXPIRE` | Refresh token lifetime (e.g. `7d`) |
+| `TELEGRAM_BOT_TOKEN` | Global bot token (fallback) |
+| `TELEGRAM_STORAGE_CHAT_ID` | Global storage chat/channel ID |
+| `TELEGRAM_API_URL` | Base Bot API URL, e.g. `https://api.telegram.org/bot<token>` |
+| `ENCRYPTION_KEY` | Key for encrypting per-user Telegram credentials |
+| `REDIS_HOST` / `REDIS_PORT` | Redis connection (optional, preview queue) |
+| `CORS_ORIGIN` | Allowed frontend origin (default `http://localhost:3000`) |
+| `BCRYPT_ROUNDS` | bcrypt cost factor |
 
-| Account | Email | Password |
-|---------|-------|----------|
-| Test User 1 | testuser@example.com | TestPass123! |
-| Test User 2 | newuser@test.com | NewPass123! |
-
-### Quick Test Commands
-
-#### Register New User
-```bash
-curl -X POST http://localhost:3001/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"newuser@example.com","password":"SecurePass123!"}'
-```
-
-#### Login
-```bash
-curl -X POST http://localhost:3001/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"testuser@example.com","password":"TestPass123!"}'
-```
-
-#### Get Profile (Protected Route)
-```bash
-# Replace TOKEN with actual token from login response
-curl http://localhost:3001/api/auth/me \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-#### Health Check
-```bash
-curl http://localhost:3001/api/health
-```
-
-### Running Full Test Suite
-```bash
-# Test authentication flow
-npm run test-auth
-
-# Test database setup
-npm run test-db
-```
+> **Never commit `.env`.** It is git-ignored. Bot tokens and chat IDs must never be exposed to the client or returned in public API responses.
 
 ---
 
-## 📖 API Documentation
+## Available Scripts
 
-Complete API documentation is available in `docs/api/API_DOCUMENTATION.md`
+### Backend (`/backend`)
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start with nodemon (auto-reload) |
+| `npm start` | Start in production mode |
+| `npm run migrate` | Create/sync all database tables |
+| `npm run test-db` | Verify database setup |
+| `npm run test-auth` | Run the authentication test script |
 
-### Available Endpoints
-
-#### Authentication
-```
-POST   /api/auth/register    # Register new user
-POST   /api/auth/login       # Login and get tokens
-POST   /api/auth/refresh     # Refresh access token
-GET    /api/auth/me          # Get current user profile
-```
-
-#### File Management
-```
-POST   /api/files/upload     # Upload file to Telegram
-GET    /api/files            # List files with pagination
-GET    /api/files/:id/download # Download file from Telegram
-POST   /api/files/:id/share  # Create shared link
-DELETE /api/files/:id        # Soft delete file
-GET    /api/files/s/:token   # Public shared link access
-```
+### Frontend (`/frontend`)
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start the Vite dev server |
+| `npm run build` | Production build to `dist/` |
+| `npm run preview` | Preview the production build |
 
 ---
 
-## 📊 Database Schema
+## API Reference
 
-Four main tables with relationships:
+Base URL: `http://localhost:3001/api`
 
-### Users
-- Unique IDs (UUIDs)
-- Email/Telegram ID authentication
-- Storage quota tracking
-- Premium features support
+All protected endpoints require an `Authorization: Bearer <accessToken>` header.
 
-### Folders
-- Hierarchical structure (parent-child)
-- Telegram topic sync capability
-- Display ordering
-- Cascade delete support
+### Authentication
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/auth/register` | Register a new user |
+| `POST` | `/auth/login` | Log in and receive tokens |
+| `POST` | `/auth/refresh` | Exchange a refresh token for a new access token |
+| `GET` | `/auth/me` | Get the current user profile (protected) |
 
 ### Files
-- Telegram metadata storage
-- File type detection
-- Download tracking
-- Soft delete support
-- Shared link tokens
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/files/upload` | Upload a file (multipart, field `file`) |
+| `GET` | `/files` | List files (pagination, `folderId`, sorting) |
+| `GET` | `/files/search?q=` | Search files by filename |
+| `GET` | `/files/:id/download` | Redirect-download from Telegram CDN |
+| `GET` | `/files/:id/versions` | List version history for a file |
+| `POST` | `/files/:id/revert/:versionId` | Revert a file to a version |
+| `POST` | `/files/:id/share` | Create a shared link |
+| `DELETE` | `/files/:id` | Soft delete a file |
+| `GET` | `/files/s/:token` | Access a shared link (public) |
 
-### Shared Links
-- JWT-based access control
-- Password protection
-- Expiration dates
-- Download limits
-- Usage analytics
+### Folders
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/folders?parentFolderId=` | List folders (root when `null`) |
+| `POST` | `/folders` | Create a folder |
+| `PUT` | `/folders/:id` | Rename a folder |
+| `DELETE` | `/folders/:id` | Delete a folder (files detached to root) |
 
----
+### Telegram configuration (per user)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/user/telegram/status` | Get connection status |
+| `POST` | `/user/telegram/connect` | Connect a bot token + storage chat |
+| `PUT` | `/user/telegram/config` | Update the configuration |
+| `DELETE` | `/user/telegram/unlink` | Disconnect |
 
-## 🎯 Project Phases
+### Previews
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/previews/generate` | Generate image previews for a file |
 
-| Phase | Status | Description |
-|-------|--------|-------------|
-| **Phase 1** | ✅ Complete | Authentication system |
-| **Phase 2** | ✅ Complete | Database schema design |
-| **Phase 3** | ✅ Complete | Telegram integration & File APIs |
-| **Phase 4** | 📝 Planned | React frontend development |
-| **Phase 5** | 📝 Planned | Deployment & testing |
+### System
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Health check |
+| `GET` | `/` | API info/version |
 
----
+### Example
 
-## 📚 Documentation
+```bash
+# Register
+curl -X POST http://localhost:3001/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"SecurePass123!"}'
 
-| Document | Purpose | Location |
-|----------|---------|----------|
-| AGENTS.md | AI Agent Guidelines | Root directory |
-| PROJECT_SUMMARY.md | Overall project status | Root directory |
-| PHASE1_SUMMARY.md | Auth implementation details | docs/ |
-| PHASE2_SUMMARY.md | Database schema guide | docs/ |
-| PHASE3_SUMMARY.md | Telegram integration | docs/ |
-| API_DOCUMENTATION.md | Complete API reference | docs/api/ |
-| QUICK_REFERENCE.md | Quick lookup guide | docs/ |
-| API_QUICK_TEST_GUIDE.md | Testing examples | docs/ |
-
----
-
-## 🔧 Configuration Options
-
-### Rate Limiting
-```javascript
-// Default configuration (in src/app.js)
-const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // 100 requests per window
-});
-
-const authLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 20, // 20 auth attempts per hour
-});
-```
-
-### File Upload Limits
-```javascript
-// Maximum file size: 50MB (Telegram cloud API limit)
-const maxFileSize = 50 * 1024 * 1024;
-
-// Supported types are configured in file-upload.middleware.js
+# Upload (after logging in)
+curl -X POST http://localhost:3001/api/files/upload \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -F "file=@/path/to/file.pdf"
 ```
 
 ---
 
-## 🔒 Security Checklist
+## Database Schema
 
-✅ All passwords hashed with bcrypt (12 rounds)  
-✅ JWT tokens expire after 15 minutes  
-✅ Refresh tokens valid for 7 days  
-✅ SQL injection prevented via parameterized queries  
-✅ XSS protection via Helmet headers  
-✅ CORS properly configured  
-✅ Rate limiting on all endpoints  
-✅ Input validation on all routes  
-✅ Filename sanitization preventing path traversal  
-✅ Storage quota enforced per user  
-✅ Download tracking enabled  
+Six tables managed by Sequelize (`npm run migrate`):
 
----
+| Table | Purpose |
+|-------|---------|
+| `users` | Accounts, credentials, storage quota tracking |
+| `folders` | Hierarchical folder tree (path, depth, parent) |
+| `files` | File metadata + Telegram references + sharing/download tracking |
+| `shared_links` | Signed link tokens with expiry, limits, password |
+| `file_versions` | Version history per file with checksums |
+| `user_telegram_configs` | Per-user encrypted Telegram credentials |
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch (`feature/amazing-feature`)
-3. Commit changes (`feat: add amazing feature`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
-
-### Commit Convention
-Following [Conventional Commits](https://www.conventionalcommits.org/):
-- `feat:` - New features
-- `fix:` - Bug fixes
-- `docs:` - Documentation updates
-- `style:` - Code style changes
-- `refactor:` - Code refactoring
-- `test:` - Tests
-- `chore:` - Maintenance tasks
+Primary keys are UUIDs. Foreign keys enforce cascade/detach behavior for data integrity.
 
 ---
 
-## 📈 Roadmap
+## Security
 
-### Short Term (Next Sprint)
-- [ ] Build React frontend dashboard
-- [ ] Implement drag-drop file upload UI
-- [ ] Add folder navigation tree
-- [ ] Create file preview component
-- [ ] Mobile-responsive design
-
-### Medium Term (Q4 2026)
-- [ ] Docker containerization
-- [ ] CI/CD pipeline setup
-- [ ] Production deployment
-- [ ] SSL certificate installation
-- [ ] Redis caching layer
-- [ ] Comprehensive test suite
-
-### Long Term (2027)
-- [ ] Mobile app (iOS/Android)
-- [ ] Admin dashboard
-- [ ] Advanced search functionality
-- [ ] Collaboration features
-- [ ] Premium subscription tiers
-- [ ] Analytics dashboard
+- Passwords hashed with bcrypt.
+- JWT access tokens are short-lived; refresh tokens rotate access tokens via an Axios interceptor on the client.
+- SQL injection mitigated through Sequelize parameterized queries.
+- `helmet` sets protective HTTP headers; CORS restricted to the configured origin.
+- Rate limiting: general API and stricter auth-login limits.
+- Filenames sanitized to prevent path traversal.
+- Per-user storage quotas enforced on upload/delete.
+- Per-user Telegram credentials encrypted at rest; bot tokens and chat IDs are never sent to the client.
 
 ---
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
-### Common Issues
-
-**Issue**: Cannot connect to database  
-**Solution**: Check MySQL is running, verify `.env` credentials
-
-**Issue**: JWT authentication failing  
-**Solution**: Ensure header format is `Authorization: Bearer TOKEN`
-
-**Issue**: Upload fails with 413 error  
-**Solution**: File too large. Compress or split file
-
-**Issue**: Rate limit exceeded  
-**Solution**: Wait before retrying, or implement client-side queuing
+| Symptom | Resolution |
+|---------|------------|
+| Cannot connect to database | Ensure MySQL/MariaDB is running and `.env` credentials are correct; re-run `npm run migrate`. |
+| Migration fails on foreign keys | Ensure existing tables use matching UUID/`CHAR(36)` id types; drop stale tables and re-run. |
+| Uploads fail | Connect a valid bot token + storage chat in Settings; confirm the bot is an admin of the channel. |
+| 401 on protected routes | Send `Authorization: Bearer <token>`; the client auto-refreshes on expiry. |
+| Preview/video errors | Install `ffmpeg` and (optionally) run Redis for the preview queue. |
+| Frontend can't reach API | Confirm the backend runs on `:3001` and Vite proxy is intact in `vite.config.js`. |
 
 ---
 
-## 💡 Tips & Tricks
+## Contributing
 
-### Efficient File Uploads
-Use streaming for files >10MB:
-```javascript
-// Backend handles this automatically via multer + streams
-const inputStream = req.file.stream();
-await telegramService.uploadToStorage(inputStream, filename);
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+feat:      new feature
+fix:       bug fix
+docs:      documentation
+refactor:  code change that neither fixes a bug nor adds a feature
+chore:     tooling/maintenance
+test:      tests
 ```
 
-### Optimal Query Patterns
-Always filter by userId:
-```javascript
-// Good
-await File.findOne({ where: { id, userId } })
+Workflow:
 
-// Bad - allows cross-user access
-await File.findOne({ where: { id } })
-```
-
-### Shared Link Best Practices
-Set expiration dates:
-```javascript
-expiresIn: 86400  // 24 hours
-downloadLimit: 5  // Max 5 downloads
-```
+1. Create a feature branch.
+2. Make focused, granular commits.
+3. Open a pull request against `main`.
 
 ---
 
-## 📞 Support
+## License
 
-For questions or issues:
-- Check documentation in `docs/` folder
-- Review test scripts in `tests/` folder
-- Look at troubleshooting section above
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see LICENSE file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- [Telegram Bot API](https://core.telegram.org/bots/api) - For file storage infrastructure
-- [Sequelize ORM](https://sequelize.org/) - For database abstraction
-- [Express.js](https://expressjs.com/) - For web framework
-- Community contributors who made this possible
-
----
-
-<div align="center">
-
-**Built with ❤️ using Telegram Cloud Storage API**
-
-[View Live Demo](#) · [Report Bug](#) · [Request Feature](#)
-
-</div>
+Licensed under the [MIT License](LICENSE).
