@@ -69,10 +69,10 @@ function Register() {
           </h1>
           <ul className="mt-8 space-y-3">
             {[
-              'Unlimited storage via your own bot',
+              'Self-hosted — you run and control it',
               'No file size limits — files are chunked',
               'Optional AES-256 encryption',
-              'Signed sharing with expiry & passwords',
+              'Open source under the MIT License',
             ].map((f) => (
               <li key={f} className="flex items-center gap-3 text-ink-200">
                 <span className="w-5 h-5 rounded-full bg-primary-500/20 grid place-items-center flex-shrink-0">
@@ -94,7 +94,7 @@ function Register() {
           </Link>
 
           <h2 className="font-display font-bold text-2xl text-ink-900 dark:text-white">Create your account</h2>
-          <p className="mt-2 text-sm text-ink-500 dark:text-ink-400">Free forever. No credit card.</p>
+          <p className="mt-2 text-sm text-ink-500 dark:text-ink-400">Local account for your self-hosted instance.</p>
 
           <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
             <div>
