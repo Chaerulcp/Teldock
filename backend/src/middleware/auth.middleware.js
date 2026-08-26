@@ -7,7 +7,8 @@ const { verifyAccessToken } = require('../services/jwt.service');
 const authenticateToken = (req, res, next) => {
     try {
         const authHeader = req.headers['authorization'];
-        const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+        // Allow token via query param for media tags (<img>/<video>) that can't set headers
+        const token = (authHeader && authHeader.split(' ')[1]) || req.query.access_token;
 
         if (!token) {
             return res.status(401).json({

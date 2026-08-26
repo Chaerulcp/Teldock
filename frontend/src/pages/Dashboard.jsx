@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { fileApi, folderApi } from '../services/api';
 import { toast } from 'react-toastify';
+import FileViewer, { canPreview } from '../components/FileViewer';
 
 function formatFileSize(bytes) {
   if (!bytes || bytes === 0) return '0 B';
@@ -45,6 +46,7 @@ function Dashboard() {
   const [moveTargets, setMoveTargets] = useState([]);
   const [renaming, setRenaming] = useState(null); // file id being renamed
   const [renameValue, setRenameValue] = useState('');
+  const [viewerFile, setViewerFile] = useState(null);
 
   const loadContent = useCallback(async () => {
     setLoading(true);
@@ -218,6 +220,11 @@ function Dashboard() {
   const openFolder = (folder) => setTrail((t) => [...t, { id: folder.id, name: folder.name }]);
   const goToCrumb = (idx) => setTrail((t) => (idx < 0 ? [] : t.slice(0, idx + 1)));
 
+  const openFile = (file) => {
+    if (canPreview(file)) setViewerFile(file);
+    else window.open(fileApi.download(file.id), '_blank');
+  };
+
   const selectionMode = selected.size > 0;
 
   return (
@@ -382,7 +389,7 @@ function Dashboard() {
                         {isSel ? <CheckSquare className="w-5 h-5 text-primary-600" /> : <Square className="w-5 h-5 text-ink-400" />}
                       </button>
                       <div className="flex items-start justify-between">
-                        <div className={`w-12 h-12 rounded-xl grid place-items-center ${bg} ml-6`}>
+                        <div onClick={() => openFile(file)} className={`w-12 h-12 rounded-xl grid place-items-center ${bg} ml-6 cursor-pointer`} title="Open preview">
                           <Icon className={`w-6 h-6 ${color}`} />
                         </div>
                         <div className="flex items-center gap-1">
@@ -400,7 +407,7 @@ function Dashboard() {
                           className="mt-4 w-full text-sm px-2 py-1 rounded border border-primary-500 bg-white dark:bg-ink-800 text-ink-900 dark:text-white focus:outline-none"
                         />
                       ) : (
-                        <p className="mt-4 text-sm font-medium text-ink-900 dark:text-white truncate" title={file.displayFilename}>{file.displayFilename}</p>
+                        <p onClick={() => openFile(file)} className="mt-4 text-sm font-medium text-ink-900 dark:text-white truncate cursor-pointer hover:text-primary-600 dark:hover:text-primary-400" title={file.displayFilename}>{file.displayFilename}</p>
                       )}
                       <p className="text-xs text-ink-400 font-mono mt-0.5">{formatFileSize(file.fileSize)}</p>
                       <div className="mt-3 pt-3 border-t border-ink-100 dark:border-ink-800 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -423,7 +430,7 @@ function Dashboard() {
                       <button onClick={() => toggleSelect(file.id)} aria-label="Select file">
                         {isSel ? <CheckSquare className="w-4.5 h-4.5 text-primary-600" /> : <Square className="w-4.5 h-4.5 text-ink-300" />}
                       </button>
-                      <div className={`w-10 h-10 rounded-lg grid place-items-center flex-shrink-0 ${bg}`}><Icon className={`w-5 h-5 ${color}`} /></div>
+                      <div onClick={() => openFile(file)} className={`w-10 h-10 rounded-lg grid place-items-center flex-shrink-0 ${bg} cursor-pointer`}><Icon className={`w-5 h-5 ${color}`} /></div>
                       <div className="min-w-0 flex-1">
                         {renaming === file.id ? (
                           <input
@@ -435,7 +442,7 @@ function Dashboard() {
                           />
                         ) : (
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium text-ink-900 dark:text-white truncate">{file.displayFilename}</p>
+                            <p onClick={() => openFile(file)} className="text-sm font-medium text-ink-900 dark:text-white truncate cursor-pointer hover:text-primary-600 dark:hover:text-primary-400">{file.displayFilename}</p>
                             {file.isEncrypted && <Lock className="w-3.5 h-3.5 text-ink-400 flex-shrink-0" />}
                             {file.isChunked && <span className="text-[10px] font-mono font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 px-1.5 py-0.5 rounded flex-shrink-0">{file.partCount}×</span>}
                           </div>
@@ -479,6 +486,8 @@ function Dashboard() {
           </div>
         </div>
       )}
+      {/* File viewer */}
+      {viewerFile && <FileViewer file={viewerFile} onClose={() => setViewerFile(null)} />}
     </div>
   );
 }

@@ -81,6 +81,7 @@ export const fileApi = {
   list: (params) => api.get('/files', { params }),
   search: (q, params) => api.get('/files/search', { params: { q, ...params } }),
   download: (id) => `${window.location.origin}/api/files/${id}/download`,
+  preview: (id) => `${window.location.origin}/api/files/${id}/preview?access_token=${encodeURIComponent(localStorage.getItem('accessToken') || '')}`,
   delete: (id) => api.delete(`/files/${id}`),
   share: (id, data) => api.post(`/files/${id}/share`, data),
   versions: (id) => api.get(`/files/${id}/versions`),

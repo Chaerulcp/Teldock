@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { uploadFile, downloadFile, listFiles, searchFiles, listVersions, revertVersion, updateFile, bulkAction, shareFile, deleteFile } = require('../controllers/file.controller');
+const { uploadFile, downloadFile, previewFile, listFiles, searchFiles, listVersions, revertVersion, updateFile, bulkAction, shareFile, deleteFile } = require('../controllers/file.controller');
 const { authenticateToken } = require('../middleware/auth.middleware');
 const { createUploadMiddleware, validateFile } = require('../middleware/file-upload.middleware');
 const telegramFileService = require('../services/telegram.service');
@@ -23,6 +23,11 @@ router.post('/upload',
 router.get('/:id/download', 
     authenticateToken,
     downloadFile
+);
+
+router.get('/:id/preview',
+    authenticateToken,
+    previewFile
 );
 
 router.get('/', 

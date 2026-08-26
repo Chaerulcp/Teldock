@@ -113,10 +113,9 @@ async function uploadFile(req, res) {
 }
 
 /**
- * GET /api/files/:id/download
- * Download a file from Telegram CDN
+ * Shared streamer for download & preview. `disposition` is 'attachment' or 'inline'.
  */
-async function downloadFile(req, res) {
+async function streamFile(req, res, disposition) {
     try {
         const { id } = req.params;
 
@@ -139,7 +138,17 @@ async function downloadFile(req, res) {
             return res.status(403).json({ success: false, error: 'Access denied' });
         }
 
-        await file.incrementDownload();
+        // Inline preview does not support encrypted files (fail closed).
+        if (disposition === 'inline' && file.isEncrypted) {
+            return res.status(409).json({
+                success: false,
+                error: 'Encrypted files cannot be previewed. Download it instead.'
+            });
+        }
+
+        if (disposition === 'attachment') {
+            await file.incrementDownload();
+        }
 
         const parts = file.parts && file.parts.length > 0
             ? file.parts
@@ -184,7 +193,7 @@ async function downloadFile(req, res) {
         res.setHeader('Content-Length', contentLength);
         res.setHeader(
             'Content-Disposition',
-            `attachment; filename="${file.displayFilename}"; filename*=UTF-8''${encodedName}`
+            `${disposition}; filename="${file.displayFilename}"; filename*=UTF-8''${encodedName}`
         );
 
         if (isPartial) {
@@ -199,9 +208,9 @@ async function downloadFile(req, res) {
         );
 
         stream.on('error', (err) => {
-            console.error('❌ Download stream error:', err.message);
+            console.error('❌ Stream error:', err.message);
             if (!res.headersSent) {
-                res.status(500).json({ success: false, error: 'Download failed' });
+                res.status(500).json({ success: false, error: 'Streaming failed' });
             } else {
                 res.destroy(err);
             }
@@ -210,11 +219,26 @@ async function downloadFile(req, res) {
         stream.pipe(res);
 
     } catch (error) {
-        console.error('❌ Download failed:', error.message);
+        console.error('❌ Stream failed:', error.message);
         if (!res.headersSent) {
-            res.status(500).json({ success: false, error: 'Download failed: ' + error.message });
+            res.status(500).json({ success: false, error: 'Streaming failed: ' + error.message });
         }
     }
+}
+
+/**
+ * GET /api/files/:id/download — download as attachment.
+ */
+async function downloadFile(req, res) {
+    return streamFile(req, res, 'attachment');
+}
+
+/**
+ * GET /api/files/:id/preview — inline stream for in-app viewers (image/pdf/audio/video),
+ * with Range support for media seeking. Encrypted files are rejected.
+ */
+async function previewFile(req, res) {
+    return streamFile(req, res, 'inline');
 }
 
 /**
@@ -624,6 +648,7 @@ async function bulkAction(req, res) {
 module.exports = {
     uploadFile,
     downloadFile,
+    previewFile,
     listFiles,
     searchFiles,
     listVersions,
