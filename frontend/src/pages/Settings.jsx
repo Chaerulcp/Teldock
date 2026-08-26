@@ -1,0 +1,300 @@
+import { useState, useEffect } from 'react';
+import { Settings as SettingsIcon, User, Cloud, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useAuthStore } from '../store/auth-store';
+import { toast } from 'react-toastify';
+
+function Settings() {
+  const user = useAuthStore((state) => state.user);
+  const [activeTab, setActiveTab] = useState('telegram');
+  const [isLoading, setIsLoading] = useState(false);
+  const [telegramStatus, setTelegramStatus] = useState(null);
+
+  // Load telegram status on mount
+  useEffect(() => {
+    loadTelegramStatus();
+  }, []);
+
+  const loadTelegramStatus = async () => {
+    try {
+      const response = await fetch('/api/user/telegram/status', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setTelegramStatus(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to load Telegram status:', error);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Settings</h1>
+          <p className="text-gray-600">Manage your account preferences</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="flex border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('telegram')}
+              className={`flex items-center px-6 py-4 font-medium transition-colors ${
+                activeTab === 'telegram' 
+                  ? 'text-primary-600 border-b-2 border-primary-600' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Cloud className="w-5 h-5 mr-2" />
+              Telegram Integration
+            </button>
+            
+            <button
+              onClick={() => setActiveTab('profile')}
+              className={`flex items-center px-6 py-4 font-medium transition-colors ${
+                activeTab === 'profile' 
+                  ? 'text-primary-600 border-b-2 border-primary-600' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <User className="w-5 h-5 mr-2" />
+              Account Profile
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="p-6">
+            {activeTab === 'telegram' && (
+              <TelegramSetupTab 
+                status={telegramStatus}
+                onRefresh={loadTelegramStatus}
+              />
+            )}
+
+            {activeTab === 'profile' && (
+              <div className="text-center py-12 text-gray-500">
+                <User className="mx-auto w-12 h-12 mb-4 text-gray-300" />
+                <p>Account profile settings coming soon...</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Telegram Setup Tab Component
+function TelegramSetupTab({ status, onRefresh }) {
+  const [showConnect, setShowConnect] = useState(!status?.isConnected);
+  const [formData, setFormData] = useState({
+    botToken: '',
+    chatId: '',
+    chatType: 'channel',
+    username: ''
+  });
+  const [isValidating, setIsValidating] = useState(false);
+
+  const handleTestConnection = async () => {
+    setIsValidating(true);
+    
+    try {
+      const testUrl = `https://api.telegram.org/bot${formData.botToken}/getMe`;
+      const response = await fetch(testUrl);
+      
+      if (!response.ok) {
+        throw new Error('Invalid bot token');
+      }
+
+      const result = await response.json();
+      
+      if (result.ok) {
+        toast.success('Bot connected successfully!', {
+          autoClose: 2000
+        });
+        connectTelegram();
+      } else {
+        toast.error('Invalid bot token or API error');
+      }
+    } catch (error) {
+      toast.error('Failed to connect to Telegram: ' + error.message);
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const connectTelegram = async () => {
+    try {
+      const response = await fetch('/api/user/telegram/connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Telegram connected successfully!');
+        setShowConnect(false);
+        onRefresh();
+      } else {
+        toast.error(data.error || 'Failed to connect');
+      }
+    } catch (error) {
+      toast.error('Connection failed');
+    }
+  };
+
+  if (showConnect && !status?.isConnected) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start">
+            <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold text-blue-900 mb-1">Connect Your Telegram Bot</h3>
+              <p className="text-sm text-blue-700">
+                To upload files to Telegram, you need to connect your own Telegram bot. Follow these steps:
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Bot Token <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.botToken}
+              onChange={(e) => setFormData({...formData, botToken: e.target.value})}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="Enter your bot token from @BotFather"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Get your bot token from{' '}
+              <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+                @BotFather on Telegram
+              </a>
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Storage Chat/Channel ID <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.chatId}
+              onChange={(e) => setFormData({...formData, chatId: e.target.value})}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="-100xxxxxxxxxx"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Find this in a private chat with your bot or channel admin
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Username (Optional)
+            </label>
+            <input
+              type="text"
+              value={formData.username}
+              onChange={(e) => setFormData({...formData, username: e.target.value})}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="@mybotname"
+            />
+          </div>
+
+          <div className="flex space-x-4 pt-4">
+            <button
+              type="button"
+              onClick={handleTestConnection}
+              disabled={isValidating || !formData.botToken || !formData.chatId}
+              className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isValidating ? 'Testing...' : 'Connect & Test'}
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => window.open('https://telegra.ph/Create-a-Bot-11-13', '_blank')}
+              className="px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Learn how to create a bot"
+            >
+              ℹ️
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  if (status?.isConnected) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-start">
+            <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 mr-3 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold text-green-900">Telegram Connected</h3>
+              <p className="text-sm text-green-700">Your Telegram bot is successfully configured for file storage.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <p className="text-sm text-gray-500 mb-1">Bot Name</p>
+            <p className="font-semibold text-gray-900">{status.botName || 'Not set'}</p>
+          </div>
+          
+          <div className="bg-gray-50 rounded-lg p-4">
+            <p className="text-sm text-gray-500 mb-1">Storage ID</p>
+            <p className="font-mono text-sm text-gray-900 break-all">{status.chatId || 'N/A'}</p>
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-4">
+            <p className="text-sm text-gray-500 mb-1">Chat Type</p>
+            <p className="capitalize font-semibold text-gray-900">{status.chatType || 'N/A'}</p>
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-4">
+            <p className="text-sm text-gray-500 mb-1">Status</p>
+            <span className="inline-block px-2 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded">
+              Active
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="text-center py-12">
+      <Cloud className="mx-auto w-12 h-12 text-gray-300 mb-4" />
+      <p className="text-gray-500">No connection established</p>
+      <button
+        onClick={() => setShowConnect(true)}
+        className="mt-4 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+      >
+        Connect Telegram
+      </button>
+    </div>
+  );
+}
+
+export default Settings;
