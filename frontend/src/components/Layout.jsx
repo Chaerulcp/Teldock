@@ -51,7 +51,7 @@ function Layout() {
             <div className="w-9 h-9 rounded-xl bg-primary-500 grid place-items-center shadow-glow">
               <Cloud className="w-5 h-5 text-white" />
             </div>
-            <span className="font-display font-bold text-lg tracking-tight text-ink-900 dark:text-white">Nimbus</span>
+            <span className="font-display font-bold text-lg tracking-tight text-ink-900 dark:text-white">Dryv</span>
           </div>
 
           <nav className="space-y-1">
