@@ -24,8 +24,14 @@
 - [Database Schema](#database-schema)
 - [Security](#security)
 - [Troubleshooting](#troubleshooting)
+- [Disclaimer & Responsible Use](#disclaimer--responsible-use)
 - [Contributing](#contributing)
 - [License](#license)
+
+---
+
+> [!WARNING]
+> **Disclaimer — read before using.** Teldock is a **non-commercial, open-source, educational project**. Using the Telegram Bot API as a general-purpose file/cloud storage backend is **not** an intended use of Telegram's platform and may violate the [Telegram Terms of Service](https://telegram.org/tos) and [Bot API Terms](https://core.telegram.org/api/terms). Bulk storage, data hoarding, or abuse can get your bot and account **banned or your files deleted** by Telegram without notice. Use this project only with data you own, at your own risk, and for learning purposes. See [Disclaimer & Responsible Use](#disclaimer--responsible-use).
 
 ---
 
@@ -395,6 +401,31 @@ Primary keys are UUIDs. Foreign keys enforce cascade/detach behavior for data in
 | 401 on protected routes | Send `Authorization: Bearer <token>`; the client auto-refreshes on expiry. |
 | Preview/video errors | Install `ffmpeg` and (optionally) run Redis for the preview queue. |
 | Frontend can't reach API | Confirm the backend runs on `:3001` and Vite proxy is intact in `vite.config.js`. |
+
+---
+
+## Disclaimer & Responsible Use
+
+**Teldock is an open-source, non-commercial project built for learning and experimentation.** It is not a product, not a service, and is not affiliated with, endorsed by, or connected to Telegram FZ-LLC / Telegram Messenger Inc.
+
+### Telegram platform policy
+
+- Telegram provides the Bot API and cloud infrastructure for **messaging and bot interactions**, not as a free unlimited file-hosting or cloud-storage backend.
+- Repurposing Telegram as a general storage drive (especially chunking large files, bulk uploads, or "data hoarding") may **violate Telegram's [Terms of Service](https://telegram.org/tos) and [API/Bot Terms](https://core.telegram.org/api/terms)**.
+- Telegram may, at its discretion and without notice, **rate-limit, suspend, or ban** bots and accounts, and **delete stored data**, if it detects abusive or out-of-policy usage.
+
+### Your responsibilities
+
+- Use Teldock **only with data you own or have the right to store**.
+- Do **not** use it to store, distribute, or share illegal, infringing, or abusive content.
+- Respect Telegram's rate limits and fair-use expectations; do not use it for mass/commercial storage.
+- You are solely responsible for compliance with Telegram's terms and all applicable laws in your jurisdiction.
+
+### No warranty / limitation of liability
+
+This software is provided **"as is"**, without warranty of any kind (see the [MIT License](LICENSE)). The authors and contributors are **not liable** for any account bans, data loss, service disruption, legal consequences, or other damages arising from the use or misuse of this project. **Keep an independent backup of anything important — do not treat Teldock as reliable primary storage.**
+
+> In short: this is a technical demo of what's *possible*, not a recommendation of what you *should* do in production. Use responsibly and at your own risk.
 
 ---
 
