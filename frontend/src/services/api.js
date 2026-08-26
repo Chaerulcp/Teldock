@@ -88,7 +88,24 @@ export const fileApi = {
   revert: (id, versionId) => api.post(`/files/${id}/revert/${versionId}`),
   rename: (id, displayFilename) => api.patch(`/files/${id}`, { displayFilename }),
   move: (id, folderId) => api.patch(`/files/${id}`, { folderId }),
+  favorite: (id, value) => api.patch(`/files/${id}`, { isFavorite: value }),
+  setTags: (id, tagIds) => api.put(`/files/${id}/tags`, { tagIds }),
   bulk: (action, fileIds, folderId) => api.post('/files/bulk', { action, fileIds, folderId }),
+};
+
+// Tag API calls
+export const tagApi = {
+  list: () => api.get('/tags'),
+  create: (data) => api.post('/tags', data),
+  update: (id, data) => api.put(`/tags/${id}`, data),
+  delete: (id) => api.delete(`/tags/${id}`),
+};
+
+// Smart folder (saved filter) API calls
+export const smartFolderApi = {
+  list: () => api.get('/smart-folders'),
+  create: (data) => api.post('/smart-folders', data),
+  delete: (id) => api.delete(`/smart-folders/${id}`),
 };
 
 // Folder API calls

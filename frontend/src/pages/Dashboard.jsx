@@ -2,13 +2,16 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   UploadCloud, FileText, Image as ImageIcon, Video, Music, Download, Share2,
   Trash2, Folder, FolderPlus, Lock, Search, LayoutGrid, List, FileArchive,
-  File as FileIcon, ChevronRight, Home, X, Pencil, FolderInput, CheckSquare, Square, History
+  File as FileIcon, ChevronRight, Home, X, Pencil, FolderInput, CheckSquare, Square, History,
+  Star, Tag as TagIcon
 } from 'lucide-react';
 import { fileApi, folderApi } from '../services/api';
 import { toast } from 'react-toastify';
 import FileViewer, { canPreview } from '../components/FileViewer';
 import VersionHistory from '../components/VersionHistory';
+import TagPicker from '../components/TagPicker';
 import { useTransfers } from '../store/transfer-context';
+import { useSearchParams } from 'react-router-dom';
 
 function formatFileSize(bytes) {
   if (!bytes || bytes === 0) return '0 B';
@@ -29,6 +32,10 @@ function getFileMeta(mimeType) {
 
 function Dashboard() {
   const { uploadFiles, onComplete } = useTransfers();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const favoriteFilter = searchParams.get('favorite') === 'true';
+  const tagFilter = searchParams.get('tagId') || null;
+
   const [files, setFiles] = useState([]);
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +47,7 @@ function Dashboard() {
   // folder navigation: breadcrumb trail of {id, name}
   const [trail, setTrail] = useState([]);
   const currentFolder = trail.length ? trail[trail.length - 1] : null;
+  const filtering = favoriteFilter || !!tagFilter;
 
   // multi-select
   const [selected, setSelected] = useState(new Set());
@@ -49,25 +57,37 @@ function Dashboard() {
   const [renameValue, setRenameValue] = useState('');
   const [viewerFile, setViewerFile] = useState(null);
   const [historyFile, setHistoryFile] = useState(null);
+  const [tagFile, setTagFile] = useState(null);
 
   const loadContent = useCallback(async () => {
     setLoading(true);
     setSelected(new Set());
     try {
-      const parentId = currentFolder?.id ?? null;
-      const [filesRes, foldersRes] = await Promise.all([
-        fileApi.list({ limit: 200, folderId: parentId || undefined }),
-        folderApi.list(parentId),
-      ]);
-      setFiles(filesRes.data.data.files || []);
-      setFolders(foldersRes.data.data.folders || []);
+      if (filtering) {
+        // Filtered view: flat file list (no folder nesting), across all folders
+        const res = await fileApi.list({
+          limit: 200,
+          favorite: favoriteFilter ? true : undefined,
+          tagId: tagFilter || undefined,
+        });
+        setFiles(res.data.data.files || []);
+        setFolders([]);
+      } else {
+        const parentId = currentFolder?.id ?? null;
+        const [filesRes, foldersRes] = await Promise.all([
+          fileApi.list({ limit: 200, folderId: parentId || undefined }),
+          folderApi.list(parentId),
+        ]);
+        setFiles(filesRes.data.data.files || []);
+        setFolders(foldersRes.data.data.folders || []);
+      }
     } catch (error) {
       console.error('Failed to load content:', error);
       toast.error('Failed to load files');
     } finally {
       setLoading(false);
     }
-  }, [currentFolder]);
+  }, [currentFolder, filtering, favoriteFilter, tagFilter]);
 
   useEffect(() => { loadContent(); }, [loadContent]);
 
@@ -97,6 +117,18 @@ function Dashboard() {
       toast.success('Share link copied to clipboard');
     } catch {
       toast.error('Failed to create share link');
+    }
+  };
+
+  const toggleFavorite = async (file) => {
+    const value = !file.isFavorite;
+    // optimistic update
+    setFiles((prev) => prev.map((f) => (f.id === file.id ? { ...f, isFavorite: value } : f)));
+    try {
+      await fileApi.favorite(file.id, value);
+    } catch {
+      toast.error('Failed to update favorite');
+      setFiles((prev) => prev.map((f) => (f.id === file.id ? { ...f, isFavorite: !value } : f)));
     }
   };
 
@@ -222,8 +254,12 @@ function Dashboard() {
       <header className="sticky top-0 z-20 bg-ink-50/80 dark:bg-ink-950/80 backdrop-blur-md border-b border-ink-200/70 dark:border-ink-800/70">
         <div className="px-6 h-16 flex items-center gap-4">
           <div className="min-w-0">
-            <h1 className="font-display font-bold text-lg text-ink-900 dark:text-white leading-none">My Files</h1>
-            <p className="text-xs text-ink-400 mt-0.5">{folders.length} folders · {files.length} files</p>
+            <h1 className="font-display font-bold text-lg text-ink-900 dark:text-white leading-none">
+              {favoriteFilter ? 'Favorites' : tagFilter ? 'Tagged files' : 'My Files'}
+            </h1>
+            <p className="text-xs text-ink-400 mt-0.5">
+              {filtering ? `${files.length} files` : `${folders.length} folders · ${files.length} files`}
+            </p>
           </div>
           <div className="ml-auto flex items-center gap-3">
             <div className="relative hidden sm:block">
@@ -249,20 +285,32 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Breadcrumb */}
-        <div className="px-6 pb-3 flex items-center gap-1 text-sm">
-          <button onClick={() => goToCrumb(-1)} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md transition-colors ${trail.length === 0 ? 'text-ink-900 dark:text-white font-medium' : 'text-ink-500 hover:text-ink-900 dark:hover:text-white'}`}>
-            <Home className="w-3.5 h-3.5" /> Home
-          </button>
-          {trail.map((crumb, idx) => (
-            <span key={crumb.id} className="flex items-center gap-1">
-              <ChevronRight className="w-3.5 h-3.5 text-ink-300" />
-              <button onClick={() => goToCrumb(idx)} className={`px-2 py-1 rounded-md transition-colors ${idx === trail.length - 1 ? 'text-ink-900 dark:text-white font-medium' : 'text-ink-500 hover:text-ink-900 dark:hover:text-white'}`}>
-                {crumb.name}
-              </button>
+        {/* Breadcrumb / filter bar */}
+        {filtering ? (
+          <div className="px-6 pb-3 flex items-center gap-2 text-sm">
+            <span className="inline-flex items-center gap-1.5 text-primary-600 dark:text-primary-400 font-medium">
+              {favoriteFilter ? <Star className="w-3.5 h-3.5" /> : <TagIcon className="w-3.5 h-3.5" />}
+              {favoriteFilter ? 'Favorites' : 'Tag filter'}
             </span>
-          ))}
-        </div>
+            <button onClick={() => setSearchParams({})} className="inline-flex items-center gap-1 text-ink-500 hover:text-ink-900 dark:hover:text-white px-2 py-1 rounded-md transition-colors">
+              <X className="w-3.5 h-3.5" /> Clear filter
+            </button>
+          </div>
+        ) : (
+          <div className="px-6 pb-3 flex items-center gap-1 text-sm">
+            <button onClick={() => goToCrumb(-1)} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md transition-colors ${trail.length === 0 ? 'text-ink-900 dark:text-white font-medium' : 'text-ink-500 hover:text-ink-900 dark:hover:text-white'}`}>
+              <Home className="w-3.5 h-3.5" /> Home
+            </button>
+            {trail.map((crumb, idx) => (
+              <span key={crumb.id} className="flex items-center gap-1">
+                <ChevronRight className="w-3.5 h-3.5 text-ink-300" />
+                <button onClick={() => goToCrumb(idx)} className={`px-2 py-1 rounded-md transition-colors ${idx === trail.length - 1 ? 'text-ink-900 dark:text-white font-medium' : 'text-ink-500 hover:text-ink-900 dark:hover:text-white'}`}>
+                  {crumb.name}
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </header>
 
       {/* Bulk toolbar */}
@@ -349,8 +397,12 @@ function Dashboard() {
             <div className="w-16 h-16 mx-auto rounded-2xl bg-ink-100 dark:bg-ink-800 grid place-items-center">
               <Folder className="w-8 h-8 text-ink-400" />
             </div>
-            <p className="mt-4 font-display font-semibold text-ink-900 dark:text-white">{query ? 'No matching files' : 'This folder is empty'}</p>
-            <p className="mt-1 text-sm text-ink-500">{query ? 'Try a different search.' : 'Upload a file or create a folder.'}</p>
+            <p className="mt-4 font-display font-semibold text-ink-900 dark:text-white">
+              {query ? 'No matching files' : favoriteFilter ? 'No favorites yet' : tagFilter ? 'No files with this tag' : 'This folder is empty'}
+            </p>
+            <p className="mt-1 text-sm text-ink-500">
+              {query ? 'Try a different search.' : favoriteFilter ? 'Star a file to see it here.' : tagFilter ? 'Tag a file to see it here.' : 'Upload a file or create a folder.'}
+            </p>
           </div>
         ) : filtered.length === 0 ? null : (
           <div>
@@ -369,11 +421,18 @@ function Dashboard() {
                       >
                         {isSel ? <CheckSquare className="w-5 h-5 text-primary-600" /> : <Square className="w-5 h-5 text-ink-400" />}
                       </button>
+                      <button
+                        onClick={() => toggleFavorite(file)}
+                        className={`absolute top-3 right-3 z-10 transition-opacity ${file.isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        title={file.isFavorite ? 'Unfavorite' : 'Favorite'}
+                      >
+                        <Star className={`w-4.5 h-4.5 ${file.isFavorite ? 'fill-amber-400 text-amber-400' : 'text-ink-400'}`} />
+                      </button>
                       <div className="flex items-start justify-between">
                         <div onClick={() => openFile(file)} className={`w-12 h-12 rounded-xl grid place-items-center ${bg} ml-6 cursor-pointer`} title="Open preview">
                           <Icon className={`w-6 h-6 ${color}`} />
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 mr-6">
                           {file.isEncrypted && <Lock className="w-3.5 h-3.5 text-ink-400" />}
                           {file.isChunked && <span className="text-[10px] font-mono font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 px-1.5 py-0.5 rounded">{file.partCount}×</span>}
                         </div>
@@ -391,8 +450,24 @@ function Dashboard() {
                         <p onClick={() => openFile(file)} className="mt-4 text-sm font-medium text-ink-900 dark:text-white truncate cursor-pointer hover:text-primary-600 dark:hover:text-primary-400" title={file.displayFilename}>{file.displayFilename}</p>
                       )}
                       <p className="text-xs text-ink-400 font-mono mt-0.5">{formatFileSize(file.fileSize)}</p>
+                      {file.tags && file.tags.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {file.tags.map((t) => (
+                            <button
+                              key={t.id}
+                              onClick={() => setSearchParams({ tagId: t.id })}
+                              className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full text-white"
+                              style={{ backgroundColor: t.color }}
+                              title={`Filter by ${t.name}`}
+                            >
+                              {t.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       <div className="mt-3 pt-3 border-t border-ink-100 dark:border-ink-800 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => window.open(fileApi.download(file.id), '_blank')} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Download"><Download className="w-4 h-4" /></button>
+                        <button onClick={() => setTagFile(file)} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Tags"><TagIcon className="w-4 h-4" /></button>
                         <button onClick={() => { setRenaming(file.id); setRenameValue(file.displayFilename); }} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Rename"><Pencil className="w-4 h-4" /></button>
                         <button onClick={() => setHistoryFile(file)} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Version history"><History className="w-4 h-4" /></button>
                         <button onClick={() => handleShare(file.id)} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Share"><Share2 className="w-4 h-4" /></button>
@@ -425,14 +500,20 @@ function Dashboard() {
                         ) : (
                           <div className="flex items-center gap-2">
                             <p onClick={() => openFile(file)} className="text-sm font-medium text-ink-900 dark:text-white truncate cursor-pointer hover:text-primary-600 dark:hover:text-primary-400">{file.displayFilename}</p>
+                            {file.isFavorite && <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 flex-shrink-0" />}
                             {file.isEncrypted && <Lock className="w-3.5 h-3.5 text-ink-400 flex-shrink-0" />}
                             {file.isChunked && <span className="text-[10px] font-mono font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 px-1.5 py-0.5 rounded flex-shrink-0">{file.partCount}×</span>}
+                            {file.tags && file.tags.map((t) => (
+                              <button key={t.id} onClick={() => setSearchParams({ tagId: t.id })} className="text-[10px] font-medium px-1.5 py-0.5 rounded-full text-white flex-shrink-0" style={{ backgroundColor: t.color }}>{t.name}</button>
+                            ))}
                           </div>
                         )}
                         <p className="text-xs text-ink-400 font-mono">{formatFileSize(file.fileSize)} · {new Date(file.createdAt).toLocaleDateString()}</p>
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => window.open(fileApi.download(file.id), '_blank')} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Download"><Download className="w-4 h-4" /></button>
+                        <button onClick={() => toggleFavorite(file)} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors" title={file.isFavorite ? 'Unfavorite' : 'Favorite'}><Star className={`w-4 h-4 ${file.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`} /></button>
+                        <button onClick={() => setTagFile(file)} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Tags"><TagIcon className="w-4 h-4" /></button>
                         <button onClick={() => { setRenaming(file.id); setRenameValue(file.displayFilename); }} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Rename"><Pencil className="w-4 h-4" /></button>
                         <button onClick={() => setHistoryFile(file)} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Version history"><History className="w-4 h-4" /></button>
                         <button onClick={() => handleShare(file.id)} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Share"><Share2 className="w-4 h-4" /></button>
@@ -474,6 +555,9 @@ function Dashboard() {
 
       {/* Version history */}
       {historyFile && <VersionHistory file={historyFile} onClose={() => setHistoryFile(null)} onChanged={loadContent} />}
+
+      {/* Tag picker */}
+      {tagFile && <TagPicker file={tagFile} onClose={() => setTagFile(null)} onChanged={loadContent} />}
     </div>
   );
 }

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Outlet, useNavigate, NavLink, Link } from 'react-router-dom';
-import { File, LogOut, Cloud, Settings, Smartphone, Moon, Sun, HardDrive, AlertTriangle, Share2, BarChart3 } from 'lucide-react';
+import { Outlet, useNavigate, NavLink, Link, useLocation } from 'react-router-dom';
+import { File, LogOut, Cloud, Settings, Smartphone, Moon, Sun, HardDrive, AlertTriangle, Share2, BarChart3, Star, Tag as TagIcon } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../store/auth-store';
 import { useThemeStore } from '../store/theme-store';
-import { userApi } from '../services/api';
+import { userApi, tagApi, smartFolderApi } from '../services/api';
 import TransferCenter from './TransferCenter';
 
 function formatBytes(bytes) {
@@ -18,11 +18,14 @@ function formatBytes(bytes) {
 
 function Layout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const theme = useThemeStore((state) => state.theme);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
   const [tgConnected, setTgConnected] = useState(null); // null = loading
+  const [tags, setTags] = useState([]);
+  const [smartFolders, setSmartFolders] = useState([]);
 
   useEffect(() => {
     let active = true;
@@ -34,10 +37,23 @@ function Layout() {
       .catch(() => {
         if (active) setTgConnected(false);
       });
+    tagApi.list()
+      .then((res) => { if (active) setTags(res.data.data.tags || []); })
+      .catch(() => {});
+    smartFolderApi.list()
+      .then((res) => { if (active) setSmartFolders(res.data.data.smartFolders || []); })
+      .catch(() => {});
     return () => {
       active = false;
     };
-  }, []);
+  }, [location.pathname, location.search]);
+
+  const smartFolderQuery = (criteria) => {
+    const p = new URLSearchParams();
+    if (criteria.favorite) p.set('favorite', 'true');
+    if (criteria.tagId) p.set('tagId', criteria.tagId);
+    return p.toString();
+  };
 
   const handleLogout = () => {
     logout();
@@ -49,6 +65,7 @@ function Layout() {
 
   const navItems = [
     { to: '/dashboard', icon: File, label: 'All Files', end: true },
+    { to: '/dashboard?favorite=true', icon: Star, label: 'Favorites' },
     { to: '/dashboard/mobile', icon: Smartphone, label: 'Browse' },
     { to: '/dashboard/shares', icon: Share2, label: 'Shared Links' },
     { to: '/dashboard/stats', icon: BarChart3, label: 'Storage Stats' },
@@ -75,13 +92,62 @@ function Layout() {
           </div>
 
           <nav className="space-y-1">
-            {navItems.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.end} className={navClass}>
-                <item.icon className="w-[18px] h-[18px]" />
-                <span>{item.label}</span>
-              </NavLink>
-            ))}
+            {navItems.map((item) => {
+              const favActive = item.to.includes('favorite=true') && location.pathname === '/dashboard' && location.search.includes('favorite=true');
+              const allFilesActive = item.end && location.pathname === '/dashboard' && !location.search;
+              const forceActive = favActive || allFilesActive;
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  className={() => navClass({ isActive: forceActive })}
+                >
+                  <item.icon className="w-[18px] h-[18px]" />
+                  <span>{item.label}</span>
+                </NavLink>
+              );
+            })}
           </nav>
+
+          {/* Tags */}
+          {tags.length > 0 && (
+            <div className="mt-6">
+              <p className="px-3.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-400 mb-2">Tags</p>
+              <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                {tags.map((t) => (
+                  <Link
+                    key={t.id}
+                    to={`/dashboard?tagId=${t.id}`}
+                    className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-sm font-medium text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-ink-800/60 transition-colors"
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: t.color }} />
+                    <span className="truncate flex-1">{t.name}</span>
+                    <span className="text-xs text-ink-400 font-mono">{t.fileCount}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Smart folders (saved filters) */}
+          {smartFolders.length > 0 && (
+            <div className="mt-6">
+              <p className="px-3.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-400 mb-2">Smart folders</p>
+              <div className="space-y-0.5">
+                {smartFolders.map((sf) => (
+                  <Link
+                    key={sf.id}
+                    to={`/dashboard?${smartFolderQuery(sf.criteria)}`}
+                    className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-sm font-medium text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-ink-800/60 transition-colors"
+                  >
+                    <Star className="w-[18px] h-[18px] text-primary-500" />
+                    <span className="truncate flex-1">{sf.name}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-auto p-5 space-y-4">
