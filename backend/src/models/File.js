@@ -1,0 +1,227 @@
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
+const crypto = require('crypto');
+
+const File = sequelize.define('File', {
+    id: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        primaryKey: true
+    },
+    userId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+            model: 'users',
+            key: 'id'
+        },
+        onDelete: 'CASCADE'
+    },
+    folderId: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        references: {
+            model: 'folders',
+            key: 'id'
+        },
+        onDelete: 'SET NULL'
+    },
+    // Telegram storage metadata
+    telegramChatId: {
+        type: DataTypes.BIGINT,
+        allowNull: false,
+        comment: 'Telegram chat/channel ID where file is stored'
+    },
+    telegramMessageId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        comment: 'Telegram message ID for the file'
+    },
+    telegramFileId: {
+        type: DataTypes.STRING(255),
+        allowNull: false,
+        unique: true,
+        comment: 'Telegram internal file ID'
+    },
+    // Original file info
+    originalFilename: {
+        type: DataTypes.STRING(500),
+        allowNull: false,
+        comment: 'Original filename from user upload'
+    },
+    displayFilename: {
+        type: DataTypes.STRING(500),
+        allowNull: false,
+        comment: 'Filename shown in UI'
+    },
+    mimeType: {
+        type: DataTypes.STRING(100),
+        allowNull: false,
+        comment: 'MIME type of the file'
+    },
+    fileSize: {
+        type: DataTypes.BIGINT,
+        allowNull: false,
+        comment: 'File size in bytes'
+    },
+    // Sharing & permissions
+    isPublic: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        comment: 'Publicly accessible or private only'
+    },
+    sharedToken: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        unique: true,
+        comment: 'JWT token for public sharing (null if private)'
+    },
+    // Download tracking
+    downloadCount: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+        comment: 'Total times file has been downloaded'
+    },
+    lastDownloadedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Timestamp of last download'
+    },
+    // Soft delete support
+    isDeleted: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        comment: 'Soft delete flag - set TRUE when user wants to remove file'
+    },
+    deletedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Timestamp of deletion'
+    }
+}, {
+    timestamps: true,
+    tableName: 'files',
+    indexes: [
+        { fields: ['userId'] },
+        { fields: ['folderId'] },
+        { 
+            name: 'idx_telegram_file', 
+            fields: ['telegramFileId'] 
+        },
+        { 
+            name: 'idx_user_files', 
+            fields: ['userId', 'isDeleted', 'createdAt'] 
+        },
+        { 
+            name: 'idx_telegram_chat_msg', 
+            fields: ['telegramChatId', 'telegramMessageId'] 
+        },
+        { 
+            name: 'idx_shared_token', 
+            fields: ['sharedToken'],
+            unique: true
+        },
+        { 
+            name: 'idx_search', 
+            fields: ['originalFilename', 'mimeType'],
+            type: 'FULLTEXT'
+        }
+    ]
+});
+
+// Instance methods
+File.prototype.isExpiredShare = async function() {
+    if (!this.sharedToken) return false;
+    // Token expiration should be tracked separately via shared_links table
+    return false;
+};
+
+File.prototype.incrementDownload = async function() {
+    this.downloadCount += 1;
+    this.lastDownloadedAt = new Date();
+    await this.save({ silent: true });
+    return {
+        downloadCount: this.downloadCount,
+        lastDownloadedAt: this.lastDownloadedAt
+    };
+};
+
+File.prototype.generatePublicToken = async function() {
+    const tokenData = {
+        fileId: this.id,
+        purpose: 'share',
+        createdAt: Date.now()
+    };
+    
+    const token = crypto.randomBytes(32).toString('hex');
+    this.sharedToken = token;
+    await this.save();
+    
+    return token;
+};
+
+// Static helper methods
+File.deleteFile = async function(userId, fileId) {
+    const file = await File.findOne({
+        where: {
+            id: fileId,
+            userId: userId
+        }
+    });
+    
+    if (!file) {
+        throw new Error('File not found');
+    }
+    
+    file.isDeleted = true;
+    file.deletedAt = new Date();
+    await file.save();
+    
+    return file;
+};
+
+File.getUserFiles = async function(userId, options = {}) {
+    const {
+        folderId = null,
+        page = 1,
+        limit = 50,
+        sortBy = 'createdAt',
+        sortOrder = 'DESC',
+        includeDeleted = false
+    } = options;
+    
+    const where = {
+        userId: userId,
+        isDeleted: includeDeleted ? null : false
+    };
+    
+    if (folderId) {
+        where.folderId = folderId;
+    }
+    
+    const offset = (page - 1) * limit;
+    const result = await File.findAndCountAll({
+        where: where,
+        order: [[sortBy, sortOrder]],
+        limit: limit,
+        offset: offset,
+        include: [{
+            model: Folder,
+            as: 'folder',
+            attributes: ['id', 'name']
+        }],
+        attributes: {
+            exclude: ['telegramFileId'] // Don't expose internal ID publicly
+        }
+    });
+    
+    return {
+        files: result.rows,
+        total: result.count,
+        currentPage: page,
+        totalPages: Math.ceil(result.count / limit),
+        hasMore: offset + limit < result.count
+    };
+};
+
+module.exports = File;
