@@ -144,7 +144,7 @@ The backend is layered: **routes → controllers → services → models**. The 
 ## Project Structure
 
 ```
-tele-storage-app/
+Teldock/
 ├── backend/
 │   ├── src/
 │   │   ├── config/          # Database & Telegram configuration
@@ -188,8 +188,8 @@ tele-storage-app/
 ### 1. Clone
 
 ```bash
-git clone https://github.com/Chaerulcp/tele-storage-app.git
-cd tele-storage-app
+git clone https://github.com/Chaerulcp/Teldock.git
+cd Teldock
 ```
 
 ### 2. Backend setup
