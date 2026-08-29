@@ -161,6 +161,19 @@ const File = sequelize.define('File', {
     ]
 });
 
+// Telegram storage identifiers are internal: exposing chat/message ids lets a
+// client locate the raw file in the owner's channel. Strip them from every
+// serialized File so no route can leak them by spreading the row.
+const INTERNAL_ATTRIBUTES = ['telegramChatId', 'telegramMessageId', 'telegramFileId'];
+
+File.prototype.toJSON = function() {
+    const values = { ...this.get({ plain: true }) };
+    for (const key of INTERNAL_ATTRIBUTES) {
+        delete values[key];
+    }
+    return values;
+};
+
 // Instance methods
 File.prototype.isExpiredShare = async function() {
     if (!this.sharedToken) return false;
@@ -224,10 +237,13 @@ File.getUserFiles = async function(userId, options = {}) {
         tagId = null
     } = options;
 
-    const where = {
-        userId: userId,
-        isDeleted: includeDeleted ? null : false
-    };
+    const where = { userId: userId };
+
+    // `isDeleted` is a non-null boolean, so filtering on `null` would match zero
+    // rows. To include deleted files, omit the condition entirely.
+    if (!includeDeleted) {
+        where.isDeleted = false;
+    }
 
     if (folderId) {
         where.folderId = folderId;
