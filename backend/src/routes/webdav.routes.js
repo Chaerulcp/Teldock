@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { User, File, Folder, FilePart } = require('../models');
@@ -73,6 +74,15 @@ function propfindResponse(href, { isDir, size = 0, mtime = new Date(), ctype = '
 </D:response>`;
 }
 
+// Stricter rate limit for WebDAV because basic auth is vulnerable to offline brute-force.
+const webdavLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20, // Allow 20 requests per window (auth attempts only)
+    message: { success: false, error: 'WebDAV requests are limited' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+router.use(webdavLimiter);
 router.use(basicAuth);
 
 // OPTIONS - advertise DAV capabilities
@@ -203,14 +213,35 @@ async function handleGet(req, res) {
 router.get(/.*/, handleGet);
 router.head(/.*/, handleGet);
 
-// PUT - upload a file
-router.put(/.*/, express.raw({ type: '*/*', limit: process.env.MAX_UPLOAD_BYTES || '2gb' }), async (req, res) => {
+const ALLOWED_CONTENT_TYPES = new Set([
+    'application/pdf',
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    'video/mp4', 'video/webm',
+    'audio/mpeg', 'audio/wav',
+    'text/plain',
+    'application/zip', 'application/gzip'
+]);
+
+// PUT - upload a file without buffering the request body in memory.
+router.put(/.*/, async (req, res) => {
+    const maxBytes = parseInt(process.env.MAX_UPLOAD_BYTES, 10) || 2 * 1024 * 1024 * 1024;
+    const declaredLength = Number(req.headers['content-length']);
+    if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+        req.resume();
+        return res.status(413).end();
+    }
+
+    const ct = req.headers['content-type'];
+    if (!ALLOWED_CONTENT_TYPES.has(ct)) {
+        return res.status(415).json({ success: false, error: 'Unsupported file type' });
+    }
+
     const t = await sequelize.transaction();
     try {
         const userId = req.davUser.id;
         const p = davPath(req);
         const segments = p.split('/').filter(Boolean);
-        const fileName = sanitizeFilename(segments.pop());
+        const fileName = sanitizeFilename(segments.pop() || 'unnamed-file');
 
         // Resolve folder (if nested)
         let folderId = null;
@@ -219,8 +250,11 @@ router.put(/.*/, express.raw({ type: '*/*', limit: process.env.MAX_UPLOAD_BYTES 
             if (folder) folderId = folder.id;
         }
 
-        const buffer = req.body && req.body.length ? req.body : Buffer.alloc(0);
-        const result = await telegramStorage.uploadFile(userId, buffer, fileName, { encrypt: false });
+        const result = await telegramStorage.uploadStream(userId, req, fileName, {
+            encrypt: false,
+            maxBytes
+        });
+        const fileSize = result.plainSize;
 
         const file = await File.create({
             userId, folderId,
@@ -229,8 +263,8 @@ router.put(/.*/, express.raw({ type: '*/*', limit: process.env.MAX_UPLOAD_BYTES 
             telegramFileId: result.telegramFileId,
             originalFilename: fileName,
             displayFilename: fileName,
-            mimeType: req.headers['content-type'] || 'application/octet-stream',
-            fileSize: buffer.length,
+            mimeType: ct,
+            fileSize,
             isChunked: result.isChunked,
             partCount: result.partCount,
             isEncrypted: result.isEncrypted,
@@ -243,7 +277,7 @@ router.put(/.*/, express.raw({ type: '*/*', limit: process.env.MAX_UPLOAD_BYTES 
         }
 
         await User.update(
-            { storageUsedBytes: sequelize.literal('`storageUsedBytes` + ' + buffer.length) },
+            { storageUsedBytes: sequelize.literal('`storageUsedBytes` + ' + fileSize) },
             { where: { id: userId }, transaction: t }
         );
 
@@ -252,9 +286,12 @@ router.put(/.*/, express.raw({ type: '*/*', limit: process.env.MAX_UPLOAD_BYTES 
     } catch (error) {
         await t.rollback().catch(() => {});
         console.error('WebDAV PUT failed:', error.message);
-        res.status(500).end();
+        if (!res.headersSent) {
+            res.status(error.message === 'File exceeds upload limit' ? 413 : 500).end();
+        }
     }
 });
+
 
 // DELETE - remove a file or folder
 router.delete(/.*/, async (req, res) => {

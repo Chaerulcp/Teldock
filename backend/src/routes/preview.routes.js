@@ -2,28 +2,53 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth.middleware');
 const ImagePreviewService = require('../services/preview/image.service');
-const telegramFileService = require('../services/telegram.service');
-const { File } = require('../models');
+const telegramStorage = require('../services/telegram-storage.service');
+const { File, FilePart } = require('../models');
+
+// Previews are generated in-process, so the source must fit comfortably in RAM.
+const MAX_PREVIEW_SOURCE_BYTES = 25 * 1024 * 1024;
 
 /**
- * Fetch the raw file buffer from Telegram CDN for a stored file
+ * Read a stored file into a buffer via the per-user storage service. Credentials
+ * are resolved server-side by the bot pool — no global bot token is involved.
  */
-async function fetchFileBuffer(file) {
-    const downloadResult = await telegramFileService.downloadFromTelegram(file.telegramFileId);
-    const response = await fetch(downloadResult.downloadUrl);
+async function readFileBuffer(file) {
+    const parts = file.parts && file.parts.length > 0
+        ? file.parts
+        : [{
+            partIndex: 0,
+            telegramChatId: file.telegramChatId,
+            telegramMessageId: file.telegramMessageId,
+            telegramFileId: file.telegramFileId,
+            partSize: file.fileSize,
+            plainSize: file.fileSize,
+            encryptionIv: null
+        }];
 
-    if (!response.ok) {
-        throw new Error(`Failed to fetch file from Telegram: ${response.status}`);
+    const { stream } = telegramStorage.createReadStream(
+        file.userId,
+        parts,
+        file.encryptionSalt
+    );
+
+    const chunks = [];
+    let total = 0;
+    for await (const chunk of stream) {
+        total += chunk.length;
+        if (total > MAX_PREVIEW_SOURCE_BYTES) {
+            stream.destroy();
+            throw new Error('File is too large to generate a preview');
+        }
+        chunks.push(chunk);
     }
 
-    return Buffer.from(await response.arrayBuffer());
+    return Buffer.concat(chunks, total);
 }
 
 /**
  * POST /api/previews/generate
- * Generate a preview for a file. Images are generated synchronously and
- * returned as base64 data URLs. Video previews require ffmpeg and are
- * generated on the server temp dir.
+ * Generate resized image previews for a file the caller owns. Returns base64
+ * data URLs; only image files are supported.
  */
 router.post('/generate', authenticateToken, async (req, res) => {
     try {
@@ -37,9 +62,12 @@ router.post('/generate', authenticateToken, async (req, res) => {
             });
         }
 
-        const file = await File.findByPk(fileId);
+        const file = await File.findOne({
+            where: { id: fileId, isDeleted: false },
+            include: [{ model: FilePart, as: 'parts' }]
+        });
 
-        if (!file || file.isDeleted) {
+        if (!file) {
             return res.status(404).json({
                 success: false,
                 error: 'File not found'
@@ -60,7 +88,14 @@ router.post('/generate', authenticateToken, async (req, res) => {
             });
         }
 
-        const buffer = await fetchFileBuffer(file);
+        if (Number(file.fileSize) > MAX_PREVIEW_SOURCE_BYTES) {
+            return res.status(413).json({
+                success: false,
+                error: 'File is too large to generate a preview'
+            });
+        }
+
+        const buffer = await readFileBuffer(file);
         const result = await ImagePreviewService.generate(buffer);
 
         // Convert buffers to base64 data URLs for transport
@@ -85,7 +120,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
         console.error('Preview generation failed:', error.message);
         res.status(500).json({
             success: false,
-            error: error.message
+            error: 'Preview generation failed'
         });
     }
 });

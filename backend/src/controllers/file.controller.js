@@ -39,11 +39,27 @@ async function uploadFile(req, res) {
             }
         }
 
-        // Upload to Telegram (chunked + optional encryption via multi-bot pool)
-        const buffer = file.buffer;
-        const result = await telegramStorage.uploadFile(user.userId, buffer, file.originalname, {
-            encrypt
-        });
+        // Upload directly from the multipart stream. The storage service keeps
+        // at most one bounded part in memory (plus Telegram's request buffer).
+        const result = await telegramStorage.uploadStream(
+            user.userId,
+            file.stream,
+            file.originalname,
+            { encrypt, maxBytes: parseInt(process.env.MAX_UPLOAD_BYTES, 10) || 2 * 1024 * 1024 * 1024 }
+        );
+
+        // Busboy truncates a stream after the configured limit. Do not persist
+        // metadata for a truncated Telegram upload; remove any parts already
+        // sent and return the correct client error.
+        if (file.limitReached || req.fileLimitReached) {
+            await telegramStorage.deleteFile(user.userId, result.parts).catch(() => {});
+            await t.rollback();
+            return res.status(413).json({ success: false, error: 'File too large' });
+        }
+
+        // Use the streamer's byte count as the source of truth. It is final even
+        // when the request stream emitted chunks across multiple data listeners.
+        file.size = result.plainSize;
 
         const displayName = sanitizeFilename(file.originalname);
 

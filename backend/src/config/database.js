@@ -19,13 +19,17 @@ const sequelize = new Sequelize(
     }
 );
 
-// Test connection
+/**
+ * Verify the database is reachable. Throws so the caller can abort startup —
+ * a server that boots without a database only fails later, per request.
+ */
 async function testConnection() {
     try {
         await sequelize.authenticate();
         console.log('✅ MySQL connection established successfully');
     } catch (error) {
         console.error('❌ Unable to connect to MySQL:', error.message);
+        throw error;
     }
 }
 

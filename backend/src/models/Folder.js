@@ -218,11 +218,11 @@ Folder.getByPath = async function(userId, path) {
 
 Folder.searchFolders = async function(userId, searchTerm) {
     const likePattern = `%${searchTerm}%`;
-    
+
     return Folder.findAll({
         where: {
             userId,
-            $or: [
+            [Op.or]: [
                 { name: { [Op.like]: likePattern } },
                 { path: { [Op.like]: likePattern } }
             ]

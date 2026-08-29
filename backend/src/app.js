@@ -3,7 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const multer = require('multer');
 const http = require('http');
 
 const routes = require('./routes/index');
@@ -17,7 +16,12 @@ const tagRoutes = require('./routes/tag.routes'); // Tags
 const smartFolderRoutes = require('./routes/smart-folder.routes'); // Saved filters
 const webdavRouter = require('./routes/webdav.routes'); // Rclone/WebDAV
 const { testConnection } = require('./config/database');
+const { assertSecrets } = require('./config/secrets');
 const RealTimeSyncService = require('./services/realtime-sync.service');
+
+// Fail fast on missing or placeholder secrets rather than falling back to
+// values that are public in the repository.
+assertSecrets();
 
 // Initialize Express app
 const app = express();
@@ -83,15 +87,7 @@ app.use('/api/smart-folders', smartFolderRoutes); // Saved filters
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error('Error:', err.stack);
-    
-    // Handle multer errors
-    if (err instanceof multer.MulterError) {
-        return res.status(400).json({
-            success: false,
-            error: `File upload error: ${err.message}`
-        });
-    }
-    
+
     // Handle validation errors
     if (err.name === 'ValidationError') {
         return res.status(400).json({
@@ -99,12 +95,12 @@ app.use((err, req, res, next) => {
             error: err.message
         });
     }
-    
+
     // Generic error
     res.status(500).json({
         success: false,
-        error: process.env.NODE_ENV === 'production' 
-            ? 'Internal server error' 
+        error: process.env.NODE_ENV === 'production'
+            ? 'Internal server error'
             : err.message
     });
 });
@@ -148,6 +144,8 @@ async function startServer() {
     }
 }
 
-const { server, realtimeSync } = startServer();
+// `startServer()` is async, so the server/realtimeSync handles only exist once
+// it resolves. Export the promise and let consumers await it.
+const serverReady = startServer();
 
-module.exports = { app, server, realtimeSync };
+module.exports = { app, serverReady };

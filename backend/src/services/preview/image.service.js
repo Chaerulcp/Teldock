@@ -12,9 +12,24 @@ class ImagePreviewService {
       { name: 'preview', width: 800, height: 600 },
       { name: 'large', width: 1920, height: 1080 }
     ];
-    
-    // Cache for generated previews
+
+    // Cache keyed by source-content hash. Dimensions alone are not a valid key:
+    // two different images that happen to share a resolution would collide, and
+    // since this cache is process-global that leaks one user's image to another.
     this.cache = new Map();
+    this.MAX_CACHE_ENTRIES = 200;
+  }
+
+  /**
+   * Store a preview, evicting the oldest entry once the cache is full so the
+   * process does not grow without bound.
+   */
+  cacheSet(key, value) {
+    if (this.cache.size >= this.MAX_CACHE_ENTRIES) {
+      const oldestKey = this.cache.keys().next().value;
+      this.cache.delete(oldestKey);
+    }
+    this.cache.set(key, value);
   }
 
   /**
@@ -22,12 +37,15 @@ class ImagePreviewService {
    */
   async generate(fileBuffer) {
     const startTime = Date.now();
-    
+
     try {
       // Get image metadata
       const metadata = await sharp(fileBuffer).metadata();
-      
+
       console.log(`🖼️  Processing image: ${metadata.width}x${metadata.height}`);
+
+      // Identifies this exact image, so cache hits can only be the same content.
+      const sourceHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
 
       // Auto-orient based on EXIF data
       const orientedBuffer = await sharp(fileBuffer)
@@ -36,12 +54,11 @@ class ImagePreviewService {
 
       // Generate all sizes
       const previews = {};
-      
+
       for (const size of this.SIZES) {
-        const key = `${size.name}-${metadata.width}x${metadata.height}`;
-        
+        const key = `${sourceHash}-${size.name}`;
+
         if (this.cache.has(key)) {
-          console.log(`✅ Serving from cache: ${key}`);
           previews[size.name] = this.cache.get(key);
           continue;
         }
@@ -66,8 +83,7 @@ class ImagePreviewService {
           hash: crypto.createHash('md5').update(previewData).digest('hex')
         };
 
-        // Cache result
-        this.cache.set(key, previews[size.name]);
+        this.cacheSet(key, previews[size.name]);
       }
 
       const duration = Date.now() - startTime;

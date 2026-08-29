@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { Readable, PassThrough } = require('stream');
 const botPool = require('./bot-pool.service');
+const secrets = require('../config/secrets');
 const { TelegramConfig } = require('../models/TelegramConfig');
 
 /**
@@ -48,21 +49,7 @@ class TelegramStorageService {
      * Derive an AES-256 key from the master key + per-file salt.
      */
     deriveKey(salt) {
-        const master = process.env.ENCRYPTION_KEY || 'your-secret-encryption-key-change-in-production';
-        return crypto.scryptSync(master, Buffer.from(salt, 'hex'), 32);
-    }
-
-    /**
-     * Split a buffer into fixed-size parts.
-     */
-    splitBuffer(buffer) {
-        const parts = [];
-        for (let offset = 0; offset < buffer.length; offset += this.PART_SIZE) {
-            parts.push(buffer.subarray(offset, Math.min(offset + this.PART_SIZE, buffer.length)));
-        }
-        // Handle empty file as a single empty part
-        if (parts.length === 0) parts.push(Buffer.alloc(0));
-        return parts;
+        return crypto.scryptSync(secrets.encryptionKey, Buffer.from(salt, 'hex'), 32);
     }
 
     /**
@@ -107,7 +94,8 @@ class TelegramStorageService {
     }
 
     /**
-     * Upload a full file buffer as one or more parts.
+     * Upload a full file buffer as one or more parts. Thin wrapper over
+     * uploadStream so both paths share one implementation.
      *
      * @returns {Object} metadata:
      *   { isChunked, partCount, checksum, isEncrypted, encryptionSalt,
@@ -115,61 +103,162 @@ class TelegramStorageService {
      *     telegramChatId }
      */
     async uploadFile(userId, buffer, originalFilename, options = {}) {
+        return this.uploadStream(userId, Readable.from(buffer), originalFilename, options);
+    }
+
+    /**
+     * Encrypt (if requested) and upload one part, returning its FilePart row shape.
+     */
+    async uploadOnePart(userId, chatId, partIndex, plain, partName, key) {
+        const plainChecksum = crypto.createHash('sha256').update(plain).digest('hex');
+
+        let payload = plain;
+        let iv = null;
+        if (key) {
+            const ivBuf = crypto.randomBytes(16);
+            const cipher = crypto.createCipheriv('aes-256-ctr', key, ivBuf);
+            payload = Buffer.concat([cipher.update(plain), cipher.final()]);
+            iv = ivBuf.toString('hex');
+        }
+
+        const uploaded = await this.uploadPart(userId, chatId, payload, partName);
+
+        return {
+            partIndex,
+            telegramChatId: chatId,
+            telegramMessageId: uploaded.message_id,
+            telegramFileId: uploaded.file_id,
+            partSize: payload.length,
+            plainSize: plain.length,
+            encryptionIv: iv,
+            checksum: plainChecksum
+        };
+    }
+
+    /**
+     * Upload a file by consuming a Readable stream, uploading each part as soon
+     * as it fills. Peak memory is one part (PART_SIZE), not the whole file —
+     * this is what keeps a multi-GB upload out of RSS.
+     *
+     * @returns {Object} same metadata shape as uploadFile()
+     */
+    async uploadStream(userId, source, originalFilename, options = {}) {
         const chatId = await this.getStorageChatId(userId);
         const encrypt = options.encrypt === true;
+        const maxBytes = Number.isFinite(options.maxBytes) ? options.maxBytes : null;
         const safeName = this.sanitizeFilename(originalFilename);
 
-        const overallChecksum = crypto.createHash('sha256').update(buffer).digest('hex');
-
-        let salt = null;
         let key = null;
+        let salt = null;
         if (encrypt) {
             salt = crypto.randomBytes(16).toString('hex');
             key = this.deriveKey(salt);
         }
 
-        const rawParts = this.splitBuffer(buffer);
+        // Hash the plaintext incrementally so the full file is never buffered.
+        const overallHash = crypto.createHash('sha256');
         const parts = [];
+        let plainSize = 0;
+        let partIndex = 0;
 
-        for (let i = 0; i < rawParts.length; i++) {
-            const plain = rawParts[i];
-            const plainChecksum = crypto.createHash('sha256').update(plain).digest('hex');
+        const emit = async (plain, isLast) => {
+            // A single-part file keeps the original filename; multi-part uses `.partN`.
+            const partName = (partIndex === 0 && isLast && parts.length === 0)
+                ? safeName
+                : `${safeName}.part${partIndex + 1}`;
+            parts.push(await this.uploadOnePart(userId, chatId, partIndex, plain, partName, key));
+            partIndex++;
+        };
 
-            let payload = plain;
-            let iv = null;
-            if (encrypt) {
-                const ivBuf = crypto.randomBytes(16);
-                const cipher = crypto.createCipheriv('aes-256-ctr', key, ivBuf);
-                payload = Buffer.concat([cipher.update(plain), cipher.final()]);
-                iv = ivBuf.toString('hex');
+        // Whether a part is the last one is only known once the input ends, and
+        // that decides its name — so hold each completed part back by one.
+        let held = null;
+        const hold = async (plain) => {
+            if (held !== null) await emit(held, false);
+            held = plain;
+        };
+
+        let carry = [];
+        let carrySize = 0;
+
+        for await (const chunk of source) {
+            const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+            if (maxBytes !== null && plainSize + buf.length > maxBytes) {
+                throw new Error('File exceeds upload limit');
             }
+            overallHash.update(buf);
+            plainSize += buf.length;
 
-            const partName = rawParts.length > 1 ? `${safeName}.part${i + 1}` : safeName;
-            const uploaded = await this.uploadPart(userId, chatId, payload, partName);
+            let offset = 0;
+            while (offset < buf.length) {
+                // Complete a partially filled part first.
+                if (carrySize > 0) {
+                    const needed = this.PART_SIZE - carrySize;
+                    const take = Math.min(needed, buf.length - offset);
+                    // Copy slices so a large source chunk is not retained by a
+                    // small part's Buffer view after this iteration completes.
+                    carry.push(Buffer.from(buf.subarray(offset, offset + take)));
+                    carrySize += take;
+                    offset += take;
 
-            parts.push({
-                partIndex: i,
-                telegramChatId: chatId,
-                telegramMessageId: uploaded.message_id,
-                telegramFileId: uploaded.file_id,
-                partSize: payload.length,
-                plainSize: plain.length,
-                encryptionIv: iv,
-                checksum: plainChecksum
-            });
+                    if (carrySize === this.PART_SIZE) {
+                        await hold(carry.length === 1 ? carry[0] : Buffer.concat(carry, carrySize));
+                        carry = [];
+                        carrySize = 0;
+                    }
+                    continue;
+                }
+
+                const remaining = buf.length - offset;
+                if (remaining >= this.PART_SIZE) {
+                    // Copy a bounded slice even when a custom source supplies a
+                    // multi-gigabyte chunk in one emission.
+                    await hold(Buffer.from(buf.subarray(offset, offset + this.PART_SIZE)));
+                    offset += this.PART_SIZE;
+                } else {
+                    carry = [Buffer.from(buf.subarray(offset))];
+                    carrySize = remaining;
+                    offset = buf.length;
+                }
+            }
         }
+
+        if (carrySize > 0) {
+            await hold(carry.length === 1 ? carry[0] : Buffer.concat(carry, carrySize));
+        }
+
+        // Emit the final held part with the original filename when it is the
+        // only part; earlier parts were already emitted as `.partN`.
+        await emit(held === null ? Buffer.alloc(0) : held, true);
+
+        if (parts.length === 0) {
+            throw new Error('Upload produced no parts');
+        }
+        if (parts.some((part, index) => part.partIndex !== index)) {
+            throw new Error('Upload part sequencing failed');
+        }
+        if (parts.length > 1 && !parts.every((part, index) => index === parts.length - 1 || part.partSize > 0)) {
+            throw new Error('Upload contains an invalid empty part');
+        }
+        if (parts.length > 1 && parts[parts.length - 1].partIndex !== partIndex - 1) {
+            throw new Error('Upload part sequencing failed');
+        }
+
+        // `plainSize` is tracked from source chunks, independently of the
+        // Telegram payload sizes (which may be encrypted).
 
         return {
             isChunked: parts.length > 1,
             partCount: parts.length,
-            checksum: overallChecksum,
+            checksum: overallHash.digest('hex'),
             isEncrypted: encrypt,
             encryptionSalt: salt,
             telegramChatId: chatId,
             // Convenience refs for single-part files (backward-compatible columns)
             telegramMessageId: parts[0].telegramMessageId,
             telegramFileId: parts[0].telegramFileId,
-            parts
+            parts,
+            plainSize
         };
     }
 
@@ -242,21 +331,51 @@ class TelegramStorageService {
         const output = new PassThrough();
         const self = this;
 
+        /**
+         * Write and wait for the consumer to catch up when the buffer is full.
+         * Without this, a fast Telegram CDN feeding a slow client would pile the
+         * whole file into the PassThrough's internal buffer.
+         */
+        const writeWithBackpressure = (chunk) => {
+            if (output.write(chunk)) return Promise.resolve();
+            return new Promise((resolve, reject) => {
+                const onDrain = () => {
+                    output.off('close', onClose);
+                    output.off('error', onError);
+                    resolve();
+                };
+                const onClose = () => {
+                    output.off('drain', onDrain);
+                    output.off('error', onError);
+                    reject(new Error('Stream closed by consumer'));
+                };
+                const onError = (err) => {
+                    output.off('drain', onDrain);
+                    output.off('close', onClose);
+                    reject(err);
+                };
+                output.once('drain', onDrain);
+                output.once('close', onClose);
+                output.once('error', onError);
+            });
+        };
+
         (async () => {
             try {
                 for (const entry of layout) {
                     if (entry.end < start || entry.start > end) continue; // skip parts outside range
+                    if (output.destroyed) return; // consumer went away
 
                     const buf = await self.fetchPart(userId, entry.part, encryptionSalt);
 
                     // Slice within this part relative to the requested range
                     const sliceStart = Math.max(0, start - entry.start);
                     const sliceEnd = Math.min(entry.size - 1, end - entry.start);
-                    output.write(buf.subarray(sliceStart, sliceEnd + 1));
+                    await writeWithBackpressure(buf.subarray(sliceStart, sliceEnd + 1));
                 }
                 output.end();
             } catch (err) {
-                output.destroy(err);
+                if (!output.destroyed) output.destroy(err);
             }
         })();
 

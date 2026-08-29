@@ -1,6 +1,13 @@
 const User = require('../models').User;
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { generateAccessToken, generateRefreshToken } = require('../services/jwt.service');
+
+const BCRYPT_ROUNDS = 12;
+
+// Hash of a random secret, compared against when the account does not exist so
+// that login timing is identical for unknown and known emails.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), BCRYPT_ROUNDS);
 
 /**
  * POST /api/auth/register
@@ -38,7 +45,7 @@ async function register(req, res) {
         // Hash password if provided
         let passwordHash = null;
         if (password) {
-            passwordHash = await bcrypt.hash(password, 12);
+            passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
         }
 
         // Create user
@@ -92,33 +99,30 @@ async function register(req, res) {
  */
 async function login(req, res) {
     try {
-        const { email, password, telegramId } = req.body;
+        const { email, password } = req.body;
 
-        // Find user by email or telegramId
-        const user = await User.findOne({
-            where: {
-                email: email || null,
-                telegramId: telegramId || null
-            }
-        });
+        // Email + password is the only supported login. Telegram login is not
+        // implemented: verifying it requires checking Telegram's login-widget
+        // HMAC, and accepting a bare telegramId would be an authentication bypass.
+        if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
+            return res.status(400).json({
+                success: false,
+                error: 'Email and password are required'
+            });
+        }
 
-        if (!user) {
+        const user = await User.findOne({ where: { email } });
+
+        // Always run a bcrypt comparison so response timing does not reveal
+        // whether the account exists.
+        const storedHash = user && user.passwordHash ? user.passwordHash : DUMMY_PASSWORD_HASH;
+        const isValid = await bcrypt.compare(password, storedHash);
+
+        if (!user || !user.passwordHash || !isValid) {
             return res.status(401).json({
                 success: false,
                 error: 'Invalid credentials'
             });
-        }
-
-        // Verify password if email login
-        if (email && password) {
-            const isValid = await bcrypt.compare(password, user.passwordHash);
-            
-            if (!isValid) {
-                return res.status(401).json({
-                    success: false,
-                    error: 'Invalid credentials'
-                });
-            }
         }
 
         // Generate tokens

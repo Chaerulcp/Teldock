@@ -1,6 +1,7 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 const jwt = require('jsonwebtoken');
+const secrets = require('../config/secrets');
 
 const SharedLink = sequelize.define('SharedLink', {
     id: {
@@ -103,27 +104,34 @@ SharedLink.prototype.canUse = function() {
     return true;
 };
 
-SharedLink.prototype.recordAccess = async function() {
+/**
+ * Record a metadata/preview access. Does not consume the download quota.
+ */
+SharedLink.prototype.recordView = async function() {
     this.accessedCount += 1;
     this.lastAccessedAt = new Date();
     await this.save({ silent: true });
-    
-    if (this.allowDownload) {
-        this.usedDownloads += 1;
-        await this.save({ silent: true });
-    }
+};
+
+/**
+ * Record an actual file transfer, consuming one unit of the download quota.
+ */
+SharedLink.prototype.recordDownload = async function() {
+    this.accessedCount += 1;
+    this.lastAccessedAt = new Date();
+    this.usedDownloads += 1;
+    await this.save({ silent: true });
 };
 
 SharedLink.prototype.consume = async function() {
-    const canUse = this.canUse();
-    if (!canUse) {
+    if (!this.canUse()) {
         return {
             success: false,
             error: 'This shared link has expired or reached download limit'
         };
     }
-    
-    await this.recordAccess();
+
+    await this.recordDownload();
     return { success: true };
 };
 
@@ -148,7 +156,7 @@ SharedLink.createLink = async function(fileId, creatorId, options = {}) {
         tokenData.exp = Math.floor((Date.now() + expiresIn * 1000) / 1000);
     }
     
-    const token = jwt.sign(tokenData, process.env.JWT_SECRET || 'default-secret');
+    const token = jwt.sign(tokenData, secrets.jwtSecret);
     
     let passwordHash = null;
     if (password) {
@@ -174,7 +182,7 @@ SharedLink.createLink = async function(fileId, creatorId, options = {}) {
 
 SharedLink.validateToken = async function(token) {
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default-secret');
+        const decoded = jwt.verify(token, secrets.jwtSecret);
         
         if (decoded.purpose !== 'share') {
             throw new Error('Invalid token purpose');

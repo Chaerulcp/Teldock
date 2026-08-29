@@ -2,9 +2,7 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
-
-// Encryption key (in production, use environment variable)
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-secret-encryption-key-change-in-production';
+const secrets = require('../config/secrets');
 
 const SECRET_LENGTH = 32; // Bytes
 const ITERATIONS = 100000; // Salt rounds for hashing token
@@ -14,8 +12,8 @@ const ITERATIONS = 100000; // Salt rounds for hashing token
  */
 function encrypt(value) {
     const iv = crypto.randomBytes(16);
-    const key = crypto.scryptSync(ENCRYPTION_KEY, iv, 32);
-    
+    const key = crypto.scryptSync(secrets.encryptionKey, iv, 32);
+
     const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
     let encrypted = cipher.update(value, 'utf8', 'hex');
     encrypted += cipher.final('hex');
@@ -32,7 +30,7 @@ function encrypt(value) {
 function decrypt(ivHex, encryptedValue) {
     try {
         const iv = Buffer.from(ivHex, 'hex');
-        const key = crypto.scryptSync(ENCRYPTION_KEY, iv, 32);
+        const key = crypto.scryptSync(secrets.encryptionKey, iv, 32);
         
         const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
         let decrypted = decipher.update(encryptedValue, 'hex', 'utf8');
@@ -95,6 +93,15 @@ const TelegramConfig = sequelize.define('TelegramConfig', {
 });
 
 // Instance methods
+
+// The encrypted bot token must never reach a client, even if a route spreads
+// the whole row into a response.
+TelegramConfig.prototype.toJSON = function() {
+    const values = { ...this.get({ plain: true }) };
+    delete values.botTokenEncrypted;
+    return values;
+};
+
 TelegramConfig.prototype.decryptToken = async function() {
     if (!this.botTokenEncrypted) return null;
     

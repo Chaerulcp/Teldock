@@ -1,7 +1,9 @@
 const multer = require('multer');
 const stream = require('stream');
 const { pipeline } = require('stream/promises');
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsp = require('fs').promises;
+const path = require('path');
 
 /**
  * Create multer storage for memory-based file handling (for streaming)
@@ -17,7 +19,7 @@ const createTempFileStorage = (dir = './temp') => {
     const storage = multer.diskStorage({
         destination: async (req, file, cb) => {
             try {
-                await fs.mkdir(dir, { recursive: true });
+                await fsp.mkdir(dir, { recursive: true });
                 cb(null, dir);
             } catch (error) {
                 cb(error, null);
@@ -191,8 +193,6 @@ async function streamFromFile(filePath, outputStream) {
  * Sanitize filename to prevent security issues
  */
 function sanitizeFilename(filename) {
-    const path = require('path');
-    
     // Remove special characters
     let sanitized = filename.replace(/[<>:"\\|?*]/g, '_');
     

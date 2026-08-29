@@ -50,3 +50,7 @@ docs/
 Thumbs.db
 *.suo
 *.sw?
+
+# Local tooling artifacts
+.flyenv
+**/.flyenv

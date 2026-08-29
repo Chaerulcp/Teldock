@@ -48,9 +48,11 @@ export function TransferProvider({ children }) {
     for (const entry of entries) {
       update(entry.id, { status: 'uploading' });
       const formData = new FormData();
-      formData.append('file', entry.file);
+      // Send fields before the file so the streaming multipart parser has the
+      // upload options available when it hands the file stream to the backend.
       if (opts.folderId) formData.append('folderId', opts.folderId);
       if (opts.encrypt) formData.append('encrypt', 'true');
+      formData.append('file', entry.file);
       try {
         await fileApi.upload(formData, (evt) => {
           if (evt.total) update(entry.id, { progress: Math.round((evt.loaded / evt.total) * 100) });

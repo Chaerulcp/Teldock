@@ -32,10 +32,11 @@ class VideoPreviewService {
    */
   async extractThumbnail(videoBuffer) {
     let inputFile;
+    let outputPath;
     try {
       const timestamp = '00:00:01';
       const tempDir = await this.getTempDir();
-      const outputPath = path.join(tempDir, `video-thumb-${Date.now()}.jpg`);
+      outputPath = path.join(tempDir, `video-thumb-${Date.now()}-${Math.random().toString(16).slice(2)}.jpg`);
       inputFile = await this.writeTempVideo(videoBuffer);
 
       return await new Promise((resolve, reject) => {
@@ -58,6 +59,9 @@ class VideoPreviewService {
     } finally {
       if (inputFile) {
         await fs.unlink(inputFile).catch(() => {});
+      }
+      if (outputPath) {
+        await fs.unlink(outputPath).catch(() => {});
       }
     }
   }
@@ -114,7 +118,7 @@ class VideoPreviewService {
    */
   async extractAtTime(videoBuffer, timestamp) {
     const tempDir = await this.getTempDir();
-    const outputPath = path.join(tempDir, `frame-${Date.now()}-${timestamp}.jpg`);
+    const outputPath = path.join(tempDir, `frame-${Date.now()}-${Math.random().toString(16).slice(2)}.jpg`);
     let inputFile;
 
     try {
