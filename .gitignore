@@ -54,3 +54,9 @@ Thumbs.db
 # Local tooling artifacts
 .flyenv
 **/.flyenv
+
+# Graphify knowledge graph (generated: run `graphify update .` to rebuild)
+graphify-out/
+
+# Machine-specific agent config (contains absolute paths)
+.gemini/
