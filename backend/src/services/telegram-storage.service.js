@@ -18,6 +18,32 @@ const DEFAULT_PART_SIZE = 18 * 1024 * 1024; // 18MB
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY = 1500;
 
+function getRetryDelayMs(telegramResponse, attempt) {
+    const retryAfterSeconds = Number(telegramResponse?.parameters?.retry_after);
+
+    if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+        return Math.ceil(retryAfterSeconds * 1_000);
+    }
+
+    return RETRY_BASE_DELAY * Math.pow(2, attempt - 1);
+}
+
+function isRetryableTelegramError(error) {
+    if (!error.telegramResponse) {
+        return true;
+    }
+
+    return error.telegramResponse.error_code === 429 || error.telegramResponse.error_code >= 500;
+}
+
+function createTelegramError(result, status) {
+    const error = new Error(result.description || 'Telegram upload failed');
+    error.status = status;
+    error.telegramResponse = result;
+
+    return error;
+}
+
 class TelegramStorageService {
     constructor() {
         this.PART_SIZE = parseInt(process.env.TG_PART_SIZE, 10) || DEFAULT_PART_SIZE;
@@ -81,15 +107,19 @@ class TelegramStorageService {
                     };
                 }
 
-                throw new Error(result.description || 'Telegram upload failed');
+                throw createTelegramError(result, response.status);
             } catch (error) {
                 lastError = error;
-                if (attempt < MAX_RETRIES) {
-                    const delay = RETRY_BASE_DELAY * Math.pow(2, attempt - 1);
-                    await new Promise((r) => setTimeout(r, delay));
+
+                if (attempt === MAX_RETRIES || !isRetryableTelegramError(error)) {
+                    break;
                 }
+
+                const delay = getRetryDelayMs(error.telegramResponse, attempt);
+                await new Promise((resolve) => setTimeout(resolve, delay));
             }
         }
+
         throw lastError;
     }
 
@@ -404,4 +434,7 @@ class TelegramStorageService {
     }
 }
 
-module.exports = new TelegramStorageService();
+const telegramStorageService = new TelegramStorageService();
+
+module.exports = telegramStorageService;
+module.exports.getRetryDelayMs = getRetryDelayMs;

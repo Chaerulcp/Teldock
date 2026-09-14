@@ -35,6 +35,7 @@
 5. Downloads reassemble chunks in order with HTTP Range support for seeking/resuming
 
 This design achieves:
+
 - ✅ Minimal server disk usage (only database + cache)
 - ✅ Bandwidth offloaded to Telegram CDN
 - ✅ Multi-user isolation (each account stores in their own channel)
@@ -46,43 +47,43 @@ This design achieves:
 
 ### Core Functionality
 
-| Feature | Description |
-|---------|-------------|
-| **Chunked Uploads** | Files split into bounded parts (~18 MB), uploaded concurrently across multi-bot pools |
-| **Streaming Downloads** | Parts stitched together with backpressure handling; supports resumable downloads |
-| **Multi-Bot Pool** | Add multiple bot tokens per user for higher throughput via round-robin distribution |
-| **Version History** | Automatic version snapshots on overwrite with revert capability |
-| **Soft Delete** | Files marked deleted but recoverable; tracks storage usage deltas |
+| Feature                 | Description                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------- |
+| **Chunked Uploads**     | Files split into bounded parts (~18 MB), uploaded concurrently across multi-bot pools |
+| **Streaming Downloads** | Parts stitched together with backpressure handling; supports resumable downloads      |
+| **Multi-Bot Pool**      | Add multiple bot tokens per user for higher throughput via round-robin distribution   |
+| **Version History**     | Automatic version snapshots on overwrite with revert capability                       |
+| **Soft Delete**         | Files marked deleted but recoverable; tracks storage usage deltas                     |
 
 ### User Experience
 
-| Feature | Description |
-|---------|-------------|
-| **Folder Structure** | Hierarchical folders with path-based navigation |
-| **Search & Filter** | Filename search, favorites, tags, smart saved filters |
-| **File Preview** | Image previews (multiple sizes, WebP optimized) inline in browser |
-| **Sharing** | Public links with expiration, download limits, password protection |
-| **WebDAV Mount** | Mount as OS drive via Rclone (`/webdav` endpoint) |
+| Feature              | Description                                                        |
+| -------------------- | ------------------------------------------------------------------ |
+| **Folder Structure** | Hierarchical folders with path-based navigation                    |
+| **Search & Filter**  | Filename search, favorites, tags, smart saved filters              |
+| **File Preview**     | Image previews (multiple sizes, WebP optimized) inline in browser  |
+| **Sharing**          | Public links with expiration, download limits, password protection |
+| **WebDAV Mount**     | Mount as OS drive via Rclone (`/webdav` endpoint)                  |
 
 ### Security & Encryption
 
-| Feature | Description |
-|---------|-------------|
+| Feature                    | Description                                               |
+| -------------------------- | --------------------------------------------------------- |
 | **AES-256-CTR Encryption** | Opt-in per-file encryption with random salt + per-part IV |
-| **Encrypted Credentials** | Bot tokens stored encrypted at rest (AES-256-CBC) |
-| **JWT Authentication** | Short-lived access tokens + refresh token rotation |
-| **Rate Limiting** | General API limits + stricter auth login limits |
-| **No Metadata Leakage** | Internal Telegram IDs never exposed in API responses |
+| **Encrypted Credentials**  | Bot tokens stored encrypted at rest (AES-256-CBC)         |
+| **JWT Authentication**     | Short-lived access tokens + refresh token rotation        |
+| **Rate Limiting**          | General API limits + stricter auth login limits           |
+| **No Metadata Leakage**    | Internal Telegram IDs never exposed in API responses      |
 
 ### Infrastructure
 
-| Component | Technology |
-|-----------|------------|
-| **Backend Runtime** | Node.js 22.x |
-| **Web Framework** | Express 5 |
-| **Database** | MySQL/MariaDB via Sequelize ORM |
-| **Real-time Sync** | Socket.IO WebSocket channel |
-| **Preview Queue** | BullMQ + Redis (optional) |
+| Component            | Technology                                |
+| -------------------- | ----------------------------------------- |
+| **Backend Runtime**  | Node.js 22.x                              |
+| **Web Framework**    | Express 5                                 |
+| **Database**         | MySQL/MariaDB via Sequelize ORM           |
+| **Real-time Sync**   | Socket.IO WebSocket channel               |
+| **Preview Queue**    | BullMQ + Redis (optional)                 |
 | **Media Processing** | Sharp (images), FFmpeg (video thumbnails) |
 
 ---
@@ -154,6 +155,7 @@ DB_PASSWORD=your_password
 
 JWT_SECRET=<generate-random-secret>          # Required
 JWT_EXPIRE=15m
+FILE_ACCESS_TOKEN_EXPIRE=5m                 # Signed preview/download URLs
 REFRESH_TOKEN_SECRET=<generate-random-secret>
 REFRESH_TOKEN_EXPIRE=7d
 ENCRYPTION_KEY=<generate-random-secret>      # Required for bot token encryption
@@ -184,19 +186,20 @@ For detailed setup instructions, see **[QUICK_START.md](QUICK_START.md)**.
 
 Comprehensive documentation available:
 
-| Document | Purpose |
-|----------|---------|
-| [README.md](README.md) | This overview document |
-| [QUICK_START.md](QUICK_START.md) | Step-by-step setup guide |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Guidelines for contributors |
+| Document                                   | Purpose                      |
+| ------------------------------------------ | ---------------------------- |
+| [README.md](README.md)                     | This overview document       |
+| [QUICK_START.md](QUICK_START.md)           | Step-by-step setup guide     |
+| [CONTRIBUTING.md](CONTRIBUTING.md)         | Guidelines for contributors  |
 | [SECURITY_CHANGES.md](SECURITY_CHANGES.md) | Recent security improvements |
-| [API Reference](#api-reference) | REST API endpoints |
+| [API Reference](#api-reference)            | REST API endpoints           |
 
 ### API Endpoints
 
 **Base URL:** `http://localhost:3001/api`
 
 #### Authentication
+
 ```
 POST   /auth/register      Register new user
 POST   /auth/login         Get JWT tokens
@@ -205,17 +208,24 @@ GET    /auth/me            Current user profile
 ```
 
 #### Files
+
 ```
 POST   /files/upload       Upload file (multipart)
 GET    /files              List files (paginate, filter by folder)
 GET    /files/search?q=    Search by filename
-GET    /files/:id/download Stream download (supports Range)
+POST   /files/:id/download-url Create short-lived signed download URL
+GET    /files/:id/download Stream download (signed URL; supports Range)
+POST   /files/:id/preview-url Create short-lived signed preview URL
+GET    /files/:id/preview  Stream inline preview (signed URL; supports Range)
 GET    /files/:id/versions Version history
 POST   /files/:id/share    Create share link
 DELETE /files/:id          Soft delete
 ```
 
+Download and preview URLs are bound to one file and expire after five minutes by default. Existing clients may continue using a Bearer access token while migrating to signed URLs.
+
 #### Folders
+
 ```
 GET    /folders?parent=    List folders
 POST   /folders            Create folder
@@ -224,14 +234,17 @@ DELETE /folders/:id        Delete folder
 ```
 
 #### Sharing
+
 ```
 GET    /files/s/:token     Access public shared link
+                         Password-protected links use X-Share-Password header
 POST   /shares             Create/manage shares
 GET    /shares             List my shares
 DELETE /shares/:id         Revoke share
 ```
 
 #### WebDAV (Rclone-compatible)
+
 ```
 PROPFIND, GET, PUT, DELETE, MKCOL, MOVE /webdav/*
 Authentication: HTTP Basic (email:password)
@@ -245,14 +258,14 @@ For full API documentation, see the comments in source code or [README](README.m
 
 ### What We Protect
 
-| Concern | Protection Mechanism |
-|---------|---------------------|
-| Bot tokens | Encrypted at rest (AES-256-CBC), never sent to client |
-| Passwords | Bcrypt hashed with configurable cost factor |
-| File metadata | Internal Telegram IDs excluded from API responses |
-| Rate abuse | Rate limiting on general API + stricter auth limits |
-| XSS attacks | Input sanitization, Content-Security-Policy headers |
-| SQL injection | Sequelize parameterized queries |
+| Concern       | Protection Mechanism                                  |
+| ------------- | ----------------------------------------------------- |
+| Bot tokens    | Encrypted at rest (AES-256-CBC), never sent to client |
+| Passwords     | Bcrypt hashed with configurable cost factor           |
+| File metadata | Internal Telegram IDs excluded from API responses     |
+| Rate abuse    | Rate limiting on general API + stricter auth limits   |
+| XSS attacks   | Input sanitization, Content-Security-Policy headers   |
+| SQL injection | Sequelize parameterized queries                       |
 
 ### Data Privacy
 
@@ -264,6 +277,7 @@ For full API documentation, see the comments in source code or [README](README.m
 ### Security Improvements
 
 Recent additions ([SECURITY_CHANGES.md](SECURITY_CHANGES.md)):
+
 - Fixed authentication bypass vulnerability
 - Prevented bot token exposure via redirect leakage
 - Added strict secret validation at boot time
@@ -324,4 +338,4 @@ Built with ❤️ using Telegram Bot API, Express, React, and Sequelize.
 
 ---
 
-*Last updated: August 29, 2026*
+_Last updated: August 29, 2026_

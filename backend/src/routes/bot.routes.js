@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth.middleware');
+const { validateBody } = require('../middleware/validation.middleware');
+const { botTokenSchema } = require('../validation/telegram.validation');
 const botPool = require('../services/bot-pool.service');
+const { z } = require('zod');
 
 router.use(authenticateToken);
 
@@ -23,7 +26,7 @@ router.get('/', async (req, res) => {
  * POST /api/bots
  * Add a bot token to the pool (validated against Telegram)
  */
-router.post('/', async (req, res) => {
+router.post('/', validateBody(z.object({ token: botTokenSchema })), async (req, res) => {
     try {
         const { token } = req.body;
         if (!token) {
@@ -45,8 +48,10 @@ router.post('/', async (req, res) => {
         });
     } catch (error) {
         console.error('Add bot failed:', error.message);
-        const status = error.message.includes('Invalid') || error.message.includes('already') ? 400 : 500;
-        res.status(status).json({ success: false, error: error.message });
+        const isExpectedError = error.message.includes('Invalid') || error.message.includes('already');
+        const status = isExpectedError ? 400 : 500;
+        const message = isExpectedError ? error.message : 'Failed to add bot';
+        res.status(status).json({ success: false, error: message });
     }
 });
 

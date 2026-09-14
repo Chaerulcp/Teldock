@@ -234,35 +234,9 @@ function TelegramSetupTab({ status, onRefresh }) {
   });
   const [isValidating, setIsValidating] = useState(false);
 
-  const handleTestConnection = async () => {
+  const handleConnect = async () => {
     setIsValidating(true);
-    
-    try {
-      const testUrl = `https://api.telegram.org/bot${formData.botToken}/getMe`;
-      const response = await fetch(testUrl);
-      
-      if (!response.ok) {
-        throw new Error('Invalid bot token');
-      }
 
-      const result = await response.json();
-      
-      if (result.ok) {
-        toast.success('Bot connected successfully!', {
-          autoClose: 2000
-        });
-        connectTelegram();
-      } else {
-        toast.error('Invalid bot token or API error');
-      }
-    } catch (error) {
-      toast.error('Failed to connect to Telegram: ' + error.message);
-    } finally {
-      setIsValidating(false);
-    }
-  };
-
-  const connectTelegram = async () => {
     try {
       const response = await fetch('/api/user/telegram/connect', {
         method: 'POST',
@@ -272,18 +246,20 @@ function TelegramSetupTab({ status, onRefresh }) {
         },
         body: JSON.stringify(formData)
       });
-
       const data = await response.json();
 
-      if (data.success) {
-        toast.success('Telegram connected successfully!');
-        setShowConnect(false);
-        onRefresh();
-      } else {
+      if (!data.success) {
         toast.error(data.error || 'Failed to connect');
+        return;
       }
+
+      toast.success('Telegram connected successfully!');
+      setShowConnect(false);
+      onRefresh();
     } catch (error) {
       toast.error('Connection failed');
+    } finally {
+      setIsValidating(false);
     }
   };
 
@@ -354,7 +330,7 @@ function TelegramSetupTab({ status, onRefresh }) {
           <div className="flex space-x-4 pt-4">
             <button
               type="button"
-              onClick={handleTestConnection}
+              onClick={handleConnect}
               disabled={isValidating || !formData.botToken || !formData.chatId}
               className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -395,8 +371,8 @@ function TelegramSetupTab({ status, onRefresh }) {
           </div>
           
           <div className="bg-gray-50 rounded-lg p-4">
-            <p className="text-sm text-gray-500 mb-1">Storage ID</p>
-            <p className="font-mono text-sm text-gray-900 break-all">{status.chatId || 'N/A'}</p>
+            <p className="text-sm text-gray-500 mb-1">Storage Channel</p>
+            <p className="font-semibold text-gray-900">Connected privately</p>
           </div>
 
           <div className="bg-gray-50 rounded-lg p-4">

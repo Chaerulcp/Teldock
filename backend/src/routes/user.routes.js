@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth.middleware');
+const { validateBody } = require('../middleware/validation.middleware');
 const { TelegramConfig } = require('../models/TelegramConfig');
-const crypto = require('crypto');
+const { connectTelegramSchema, updateTelegramSchema } = require('../validation/telegram.validation');
 
 // All user routes require authentication
 router.use(authenticateToken);
@@ -11,7 +12,7 @@ router.use(authenticateToken);
  * POST /api/user/telegram/connect
  * Connect new Telegram bot & storage channel
  */
-router.post('/telegram/connect', async (req, res) => {
+router.post('/telegram/connect', validateBody(connectTelegramSchema), async (req, res) => {
     try {
         const userId = req.user.userId;
         const { botToken, chatId, chatType = 'channel', username } = req.body;
@@ -36,7 +37,6 @@ router.post('/telegram/connect', async (req, res) => {
             message: 'Telegram connected successfully',
             data: {
                 id: config.id,
-                chatId: config.storageChatId,
                 chatType: config.chatType,
                 username: config.username,
                 isSetupComplete: true
@@ -55,7 +55,7 @@ router.post('/telegram/connect', async (req, res) => {
 
         res.status(500).json({
             success: false,
-            error: error.message || 'Failed to connect Telegram'
+            error: 'Failed to connect Telegram'
         });
     }
 });
@@ -64,7 +64,7 @@ router.post('/telegram/connect', async (req, res) => {
  * PUT /api/user/telegram/config
  * Update existing Telegram config
  */
-router.put('/telegram/config', async (req, res) => {
+router.put('/telegram/config', validateBody(updateTelegramSchema), async (req, res) => {
     try {
         const userId = req.user.userId;
         const { botToken, chatId, chatType, username } = req.body;
@@ -107,7 +107,10 @@ router.put('/telegram/config', async (req, res) => {
             success: true,
             message: 'Configuration updated',
             data: {
-                ...config.toJSON()
+                id: config.id,
+                chatType: config.chatType,
+                username: config.username,
+                isSetupComplete: true
             }
         });
 
@@ -115,7 +118,7 @@ router.put('/telegram/config', async (req, res) => {
         console.error('Failed to update config:', error.message);
         res.status(500).json({
             success: false,
-            error: error.message || 'Update failed'
+            error: 'Update failed'
         });
     }
 });
@@ -160,7 +163,6 @@ router.get('/telegram/status', async (req, res) => {
             data: {
                 isConnected: config.isActive === 1,
                 botName: botInfo?.username || config.username,
-                chatId: config.storageChatId,
                 chatType: config.chatType
             }
         });

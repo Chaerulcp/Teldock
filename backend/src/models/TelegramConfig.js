@@ -99,6 +99,7 @@ const TelegramConfig = sequelize.define('TelegramConfig', {
 TelegramConfig.prototype.toJSON = function() {
     const values = { ...this.get({ plain: true }) };
     delete values.botTokenEncrypted;
+    delete values.storageChatId;
     return values;
 };
 

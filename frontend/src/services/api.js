@@ -80,8 +80,14 @@ export const fileApi = {
     }),
   list: (params) => api.get('/files', { params }),
   search: (q, params) => api.get('/files/search', { params: { q, ...params } }),
-  download: (id) => `${window.location.origin}/api/files/${id}/download`,
-  preview: (id) => `${window.location.origin}/api/files/${id}/preview?access_token=${encodeURIComponent(localStorage.getItem('accessToken') || '')}`,
+  download: async (id) => {
+    const response = await api.post(`/files/${id}/download-url`);
+    return response.data.data.url;
+  },
+  preview: async (id) => {
+    const response = await api.post(`/files/${id}/preview-url`);
+    return response.data.data.url;
+  },
   delete: (id) => api.delete(`/files/${id}`),
   share: (id, data) => api.post(`/files/${id}/share`, data),
   versions: (id) => api.get(`/files/${id}/versions`),

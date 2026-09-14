@@ -191,9 +191,24 @@ function Dashboard() {
     }
   };
 
-  const bulkDownload = () => {
-    [...selected].forEach((id) => window.open(fileApi.download(id), '_blank'));
+  const openDownload = async (id) => {
+    const downloadWindow = window.open('', '_blank');
+    if (downloadWindow) downloadWindow.opener = null;
+
+    try {
+      const url = await fileApi.download(id);
+      if (downloadWindow) {
+        downloadWindow.location.replace(url);
+      } else {
+        window.open(url, '_blank', 'noopener');
+      }
+    } catch {
+      downloadWindow?.close();
+      toast.error('Failed to prepare download');
+    }
   };
+
+  const bulkDownload = () => Promise.all([...selected].map(openDownload));
 
   const openMove = async () => {
     try {
@@ -243,7 +258,7 @@ function Dashboard() {
 
   const openFile = (file) => {
     if (canPreview(file)) setViewerFile(file);
-    else window.open(fileApi.download(file.id), '_blank');
+    else void openDownload(file.id);
   };
 
   const selectionMode = selected.size > 0;
@@ -466,7 +481,7 @@ function Dashboard() {
                         </div>
                       )}
                       <div className="mt-3 pt-3 border-t border-ink-100 dark:border-ink-800 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => window.open(fileApi.download(file.id), '_blank')} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Download"><Download className="w-4 h-4" /></button>
+                        <button onClick={() => void openDownload(file.id)} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Download"><Download className="w-4 h-4" /></button>
                         <button onClick={() => setTagFile(file)} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Tags"><TagIcon className="w-4 h-4" /></button>
                         <button onClick={() => { setRenaming(file.id); setRenameValue(file.displayFilename); }} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Rename"><Pencil className="w-4 h-4" /></button>
                         <button onClick={() => setHistoryFile(file)} className="flex-1 grid place-items-center py-1.5 rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Version history"><History className="w-4 h-4" /></button>
@@ -511,7 +526,7 @@ function Dashboard() {
                         <p className="text-xs text-ink-400 font-mono">{formatFileSize(file.fileSize)} · {new Date(file.createdAt).toLocaleDateString()}</p>
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => window.open(fileApi.download(file.id), '_blank')} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Download"><Download className="w-4 h-4" /></button>
+                        <button onClick={() => void openDownload(file.id)} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Download"><Download className="w-4 h-4" /></button>
                         <button onClick={() => toggleFavorite(file)} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors" title={file.isFavorite ? 'Unfavorite' : 'Favorite'}><Star className={`w-4 h-4 ${file.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`} /></button>
                         <button onClick={() => setTagFile(file)} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Tags"><TagIcon className="w-4 h-4" /></button>
                         <button onClick={() => { setRenaming(file.id); setRenameValue(file.displayFilename); }} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-primary-50 dark:hover:bg-primary-950/40 hover:text-primary-600 transition-colors" title="Rename"><Pencil className="w-4 h-4" /></button>

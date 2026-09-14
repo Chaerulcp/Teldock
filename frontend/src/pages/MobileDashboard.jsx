@@ -56,6 +56,23 @@ function MobileDashboard() {
     }
   };
 
+  const openDownload = async (fileId) => {
+    const downloadWindow = window.open('', '_blank');
+    if (downloadWindow) downloadWindow.opener = null;
+
+    try {
+      const url = await fileApi.download(fileId);
+      if (downloadWindow) {
+        downloadWindow.location.replace(url);
+      } else {
+        window.open(url, '_blank', 'noopener');
+      }
+    } catch {
+      downloadWindow?.close();
+      toast.error('Failed to prepare download');
+    }
+  };
+
   const getFileIcon = (mimeType) => {
     if (mimeType.startsWith('image/')) return <ImageIcon className="w-6 h-6 text-green-500" />;
     if (mimeType.startsWith('video/')) return <Video className="w-6 h-6 text-purple-500" />;
@@ -193,7 +210,7 @@ function MobileDashboard() {
                         </span>
                         <button 
                           className="p-1 hover:bg-gray-200 rounded"
-                          onClick={() => window.open(fileApi.download(file.id), '_blank')}
+                          onClick={() => void openDownload(file.id)}
                         >
                           <Download className="w-4 h-4 text-primary-600" />
                         </button>

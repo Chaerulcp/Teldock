@@ -88,7 +88,7 @@ async function register(req, res) {
         
         res.status(500).json({
             success: false,
-            error: 'Registration failed: ' + error.message
+            error: 'Registration failed'
         });
     }
 }
@@ -152,7 +152,7 @@ async function login(req, res) {
         console.error('❌ Login error:', error.message);
         res.status(500).json({
             success: false,
-            error: 'Login failed: ' + error.message
+            error: 'Login failed'
         });
     }
 }
