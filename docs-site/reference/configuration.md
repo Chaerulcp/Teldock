@@ -33,7 +33,7 @@ The list is derived from `backend/.env.example` and from every `process.env.*` r
 | `REDIS_HOST` | `localhost` | No | Host for the optional preview-generation queue. Not required to run Teldock. |
 | `REDIS_PORT` | `6379` | No | Port for the optional Redis instance. |
 | `CORS_ORIGIN` | `http://localhost:3000` | No | Allowed browser origin. Must match the frontend origin exactly; set it explicitly in production. |
-| `BCRYPT_ROUNDS` | `12` | No | Password-hashing cost factor. Documented in `.env.example`; the current code hardcodes `12` in `auth.controller.js`, so changing this variable has no effect yet. |
+| `BCRYPT_ROUNDS` | `12` | No | Password-hashing cost factor. Read by `backend/src/config/security.js`; values outside 4–15 fall back to `12` with a warning. |
 | `TG_PART_SIZE` | `18874368` (~18 MB) | No | Bytes per chunk when uploading to Telegram. Used in `telegram-storage.service.js`. |
 | `MAX_UPLOAD_BYTES` | `2147483648` (2 GB) | No | Maximum accepted upload size. Used by the HTTP and WebDAV upload paths. |
 | `WEBDAV_RATE_LIMIT_MAX` | `5000` | No | Requests allowed per 15 minutes on the `/webdav` router. Failed authentication attempts are limited separately to 20 per 15 minutes. |
@@ -101,7 +101,8 @@ The database connection variables (`DB_HOST`, `DB_NAME`, `DB_USER`, and `DB_PASS
 Optional in all environments:
 
 - `REDIS_HOST` / `REDIS_PORT` — only needed for the preview-generation queue.
-- `BCRYPT_ROUNDS`, `TELEGRAM_API_URL`, `TELEGRAM_API_SERVER_URL` — documented but not read by the current code.
+- `BCRYPT_ROUNDS` — password-hashing cost factor (4–15; defaults to `12`).
+- `TELEGRAM_API_URL`, `TELEGRAM_API_SERVER_URL` — documented but not read by the current code.
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_STORAGE_CHAT_ID` — development/testing fallbacks only.
 
 ## See also

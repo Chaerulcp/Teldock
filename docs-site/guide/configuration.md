@@ -71,7 +71,7 @@ Changing `ENCRYPTION_KEY` after data exists makes previously encrypted credentia
 | Variable | Purpose |
 | --- | --- |
 | `CORS_ORIGIN` | Allowed browser origin. Must equal the frontend origin exactly. |
-| `BCRYPT_ROUNDS` | Documented password-hashing cost. The current code hardcodes `12` in `backend/src/controllers/auth.controller.js`. |
+| `BCRYPT_ROUNDS` | Password-hashing cost. Read by `backend/src/config/security.js`; values outside 4–15 fall back to `12`. |
 
 Additional storage-related values:
 

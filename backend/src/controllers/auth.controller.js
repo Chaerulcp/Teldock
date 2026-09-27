@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { generateAccessToken, generateRefreshToken } = require('../services/jwt.service');
 
-const BCRYPT_ROUNDS = 12;
+const { bcryptRounds: BCRYPT_ROUNDS } = require('../config/security');
 
 // Hash of a random secret, compared against when the account does not exist so
 // that login timing is identical for unknown and known emails.

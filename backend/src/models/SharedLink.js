@@ -204,7 +204,8 @@ SharedLink.createLink = async function (fileId, creatorId, options = {}) {
   let passwordHash = null;
   if (password) {
     const bcrypt = require("bcryptjs");
-    passwordHash = await bcrypt.hash(password, 12);
+    const { bcryptRounds } = require("../config/security");
+    passwordHash = await bcrypt.hash(password, bcryptRounds);
   }
 
   const link = await SharedLink.create({

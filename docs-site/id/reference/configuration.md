@@ -33,7 +33,7 @@ Daftar ini disusun dari `backend/.env.example` dan dari setiap pembacaan `proces
 | `REDIS_HOST` | `localhost` | Tidak | Host untuk antrean pembuatan preview yang opsional. Tidak wajib untuk menjalankan Teldock. |
 | `REDIS_PORT` | `6379` | Tidak | Port untuk instance Redis opsional. |
 | `CORS_ORIGIN` | `http://localhost:3000` | Tidak | Origin browser yang diizinkan. Harus persis sama dengan origin frontend; tetapkan secara eksplisit di produksi. |
-| `BCRYPT_ROUNDS` | `12` | Tidak | Faktor biaya hashing password. Didokumentasikan di `.env.example`; kode saat ini mengunci `12` di `auth.controller.js`, jadi mengubah variabel ini belum berpengaruh. |
+| `BCRYPT_ROUNDS` | `12` | Tidak | Faktor biaya hashing password. Dibaca oleh `backend/src/config/security.js`; nilai di luar rentang 4–15 akan kembali ke `12` disertai peringatan. |
 | `TG_PART_SIZE` | `18874368` (~18 MB) | Tidak | Jumlah byte per potongan saat mengunggah ke Telegram. Dipakai di `telegram-storage.service.js`. |
 | `MAX_UPLOAD_BYTES` | `2147483648` (2 GB) | Tidak | Ukuran unggahan maksimum yang diterima. Dipakai oleh jalur unggah HTTP dan WebDAV. |
 | `WEBDAV_RATE_LIMIT_MAX` | `5000` | Tidak | Jumlah request yang diizinkan per 15 menit pada router `/webdav`. Percobaan autentikasi yang gagal dibatasi terpisah sebanyak 20 per 15 menit. |
@@ -101,7 +101,8 @@ Variabel koneksi database (`DB_HOST`, `DB_NAME`, `DB_USER`, dan `DB_PASSWORD` bi
 Opsional di semua lingkungan:
 
 - `REDIS_HOST` / `REDIS_PORT` — hanya diperlukan untuk antrean pembuatan preview.
-- `BCRYPT_ROUNDS`, `TELEGRAM_API_URL`, `TELEGRAM_API_SERVER_URL` — didokumentasikan tetapi belum dibaca kode saat ini.
+- `BCRYPT_ROUNDS` — faktor biaya hashing password (4–15; default `12`).
+- `TELEGRAM_API_URL`, `TELEGRAM_API_SERVER_URL` — didokumentasikan tetapi belum dibaca kode saat ini.
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_STORAGE_CHAT_ID` — hanya fallback pengembangan/pengujian.
 
 ## Lihat juga

@@ -71,7 +71,7 @@ Mengubah `ENCRYPTION_KEY` setelah ada data membuat kredensial dan file yang suda
 | Variabel | Kegunaan |
 | --- | --- |
 | `CORS_ORIGIN` | Origin browser yang diizinkan. Harus persis sama dengan origin frontend. |
-| `BCRYPT_ROUNDS` | Biaya hashing password yang didokumentasikan. Kode saat ini mengunci nilai `12` di `backend/src/controllers/auth.controller.js`. |
+| `BCRYPT_ROUNDS` | Biaya hashing password. Dibaca oleh `backend/src/config/security.js`; nilai di luar rentang 4–15 akan kembali ke `12`. |
 
 Nilai terkait penyimpanan:
 
