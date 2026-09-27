@@ -413,6 +413,9 @@ Every push to `main` and every pull request runs the GitHub Actions pipeline in
 
 ## Documentation
 
+Full documentation is available as a bilingual (English / Bahasa Indonesia) site built with
+VitePress, in the [`docs-site/`](docs-site) directory.
+
 | Document                                   | Purpose                               |
 | ------------------------------------------ | ------------------------------------- |
 | [README.md](README.md)                     | Project overview (this document)      |
@@ -421,6 +424,23 @@ Every push to `main` and every pull request runs the GitHub Actions pipeline in
 | [DEPLOYMENT.md](DEPLOYMENT.md)             | Production deployment guide           |
 | [CONTRIBUTING.md](CONTRIBUTING.md)         | Contribution guidelines and standards |
 | [SECURITY_CHANGES.md](SECURITY_CHANGES.md) | Security improvement log              |
+
+### Docs site
+
+The `docs-site/` workspace contains the complete, searchable documentation: installation,
+configuration, Telegram setup, usage, sharing, multi-bot pool, WebDAV/Rclone, deployment,
+security, API reference, database schema, and troubleshooting.
+
+```bash
+cd docs-site
+npm install
+npm run docs:dev      # local dev server
+npm run docs:build    # production build into .vitepress/dist
+npm run docs:preview  # preview the production build
+```
+
+The site is published to GitHub Pages by [`.github/workflows/deploy-docs.yml`](.github/workflows/deploy-docs.yml).
+To enable it, set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**.
 
 ---
 

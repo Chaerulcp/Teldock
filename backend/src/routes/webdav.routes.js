@@ -74,15 +74,33 @@ function propfindResponse(href, { isDir, size = 0, mtime = new Date(), ctype = '
 </D:response>`;
 }
 
-// Stricter rate limit for WebDAV because basic auth is vulnerable to offline brute-force.
+// WebDAV is used by mounted clients (rclone, OS file managers) that issue many
+// requests per operation, so the general limit must be generous. Brute-force
+// protection is applied separately to *failed* authentication attempts below.
+const webdavWindowMs = 15 * 60 * 1000; // 15 minutes
+
 const webdavLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 20, // Allow 20 requests per window (auth attempts only)
+    windowMs: webdavWindowMs,
+    max: parseInt(process.env.WEBDAV_RATE_LIMIT_MAX, 10) || 5000,
     message: { success: false, error: 'WebDAV requests are limited' },
     standardHeaders: true,
     legacyHeaders: false
 });
+
+// Counts only rejected (401) attempts, because basic auth is vulnerable to
+// offline brute-force. Successful requests are refunded by
+// `skipSuccessfulRequests`, so legitimate mounted clients are never throttled.
+const webdavAuthLimiter = rateLimit({
+    windowMs: webdavWindowMs,
+    max: 20, // failed auth attempts per window
+    skipSuccessfulRequests: true,
+    message: { success: false, error: 'Too many failed WebDAV authentication attempts' },
+    standardHeaders: false,
+    legacyHeaders: false
+});
+
 router.use(webdavLimiter);
+router.use(webdavAuthLimiter);
 router.use(basicAuth);
 
 // OPTIONS - advertise DAV capabilities

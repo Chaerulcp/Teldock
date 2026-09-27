@@ -1,0 +1,216 @@
+/**
+ * Teldock documentation theme.
+ *
+ * Extends the default VitePress theme. Brand tokens are layered on top of the
+ * stock variables so the site keeps VitePress' layout and accessibility
+ * guarantees while adopting Teldock's own identity.
+ */
+
+/* ------------------------------------------------------------------ *
+ * Brand ramp — derived from Telegram blue (#229ED9)
+ * ------------------------------------------------------------------ */
+
+:root {
+  --vp-c-brand-1: #0b7fbe;
+  --vp-c-brand-2: #229ed9;
+  --vp-c-brand-3: #4cb3e6;
+  --vp-c-brand-soft: rgba(34, 158, 217, 0.14);
+
+  --vp-c-brand-contrast: #ffffff;
+
+  /* Slightly cool neutral base so the site does not read as stock VitePress. */
+  --vp-c-bg: #ffffff;
+  --vp-c-bg-alt: #f5f8fa;
+  --vp-c-bg-soft: #f5f8fa;
+  --vp-c-bg-elv: #ffffff;
+
+  --vp-c-divider: #dfe6ea;
+  --vp-c-border: #d3dde3;
+  --vp-c-gutter: #dfe6ea;
+
+  --vp-c-text-1: #14212b;
+  --vp-c-text-2: #41535f;
+  --vp-c-text-3: #6b7d89;
+
+  --teldock-radius: 10px;
+  --teldock-shadow-soft: 0 1px 2px rgba(15, 40, 55, 0.04),
+    0 8px 24px rgba(15, 40, 55, 0.06);
+}
+
+.dark {
+  --vp-c-brand-1: #4cb3e6;
+  --vp-c-brand-2: #229ed9;
+  --vp-c-brand-3: #7cc9ee;
+  --vp-c-brand-soft: rgba(34, 158, 217, 0.2);
+
+  --vp-c-brand-contrast: #08131a;
+
+  --vp-c-bg: #0e161c;
+  --vp-c-bg-alt: #0a1116;
+  --vp-c-bg-soft: #131d24;
+  --vp-c-bg-elv: #131d24;
+
+  --vp-c-divider: #24313a;
+  --vp-c-border: #2c3b45;
+  --vp-c-gutter: #1a252d;
+
+  --vp-c-text-1: #e7eef2;
+  --vp-c-text-2: #adbec8;
+  --vp-c-text-3: #7d8f9a;
+
+  --teldock-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3),
+    0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* ------------------------------------------------------------------ *
+ * Typography
+ * ------------------------------------------------------------------ */
+
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3,
+.vp-doc h4,
+.VPHero .name,
+.VPHero .text {
+  letter-spacing: -0.015em;
+}
+
+.vp-doc h2 {
+  border-top-color: var(--vp-c-divider);
+}
+
+.vp-doc a {
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.vp-doc a:hover {
+  color: var(--vp-c-brand-1);
+}
+
+/* ------------------------------------------------------------------ *
+ * Tables
+ * ------------------------------------------------------------------ */
+
+.vp-doc table {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  border-radius: var(--teldock-radius);
+  overflow: hidden;
+}
+
+.vp-doc tr:nth-child(2n) {
+  background-color: var(--vp-c-bg-alt);
+}
+
+.vp-doc th {
+  background-color: var(--vp-c-bg-soft);
+  font-weight: 600;
+}
+
+.vp-doc th,
+.vp-doc td {
+  border-color: var(--vp-c-divider);
+}
+
+/* ------------------------------------------------------------------ *
+ * Code
+ * ------------------------------------------------------------------ */
+
+.vp-doc div[class*="language-"] {
+  border-radius: var(--teldock-radius);
+  border: 1px solid var(--vp-c-divider);
+}
+
+.vp-doc :not(pre) > code {
+  border-radius: 5px;
+  background-color: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------------ *
+ * Home hero
+ * ------------------------------------------------------------------ */
+
+.VPHero {
+  position: relative;
+  overflow: hidden;
+}
+
+.VPHero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    60% 70% at 78% 18%,
+    var(--vp-c-brand-soft) 0%,
+    transparent 70%
+  );
+}
+
+.VPHero .name,
+.VPHero .text {
+  position: relative;
+}
+
+.VPHero .tagline {
+  position: relative;
+  max-width: 40rem;
+}
+
+.VPButton.brand {
+  border-color: var(--vp-c-brand-1);
+  background-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-contrast);
+}
+
+.VPButton.brand:hover {
+  border-color: var(--vp-c-brand-2);
+  background-color: var(--vp-c-brand-2);
+}
+
+.VPButton.alt {
+  border-color: var(--vp-c-border);
+}
+
+/* ------------------------------------------------------------------ *
+ * Home feature grid
+ * ------------------------------------------------------------------ */
+
+.VPFeatures .VPFeature {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: var(--teldock-radius);
+  background-color: var(--vp-c-bg-soft);
+  box-shadow: var(--teldock-shadow-soft);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.VPFeatures .VPFeature:hover {
+  border-color: var(--vp-c-brand-2);
+  transform: translateY(-2px);
+}
+
+.VPFeature .title {
+  letter-spacing: -0.01em;
+}
+
+/* ------------------------------------------------------------------ *
+ * Focus + motion
+ * ------------------------------------------------------------------ */
+
+:focus-visible {
+  outline: 2px solid var(--vp-c-brand-2);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .VPFeatures .VPFeature,
+  .VPFeatures .VPFeature:hover {
+    transition: none;
+    transform: none;
+  }
+}
