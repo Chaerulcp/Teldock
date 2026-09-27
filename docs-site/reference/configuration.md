@@ -37,7 +37,7 @@ The list is derived from `backend/.env.example` and from every `process.env.*` r
 | `TG_PART_SIZE` | `18874368` (~18 MB) | No | Bytes per chunk when uploading to Telegram. Used in `telegram-storage.service.js`. |
 | `MAX_UPLOAD_BYTES` | `2147483648` (2 GB) | No | Maximum accepted upload size. Used by the HTTP and WebDAV upload paths. |
 | `WEBDAV_RATE_LIMIT_MAX` | `5000` | No | Requests allowed per 15 minutes on the `/webdav` router. Failed authentication attempts are limited separately to 20 per 15 minutes. |
-| `FRONTEND_URL` | *(empty)* | No | Base URL used to build share short links (for example `<FRONTEND_URL>/s/<token>`). Read in `SharedLink`, `share.controller.js` and `file-management.service.js`, but **not present in `.env.example`** — add it if you want absolute share URLs. |
+| `FRONTEND_URL` | `http://localhost:3000` | No | Base URL used to build absolute share short links (for example `<FRONTEND_URL>/s/<token>`). Read in `SharedLink`, `share.controller.js` and `file-management.service.js`. Set it to your public frontend origin in production; without it, share links are returned as relative paths. |
 
 ## Example `.env`
 

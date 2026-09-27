@@ -9,6 +9,7 @@ import Settings from './pages/Settings'
 import MobileDashboard from './pages/MobileDashboard'
 import Shares from './pages/Shares'
 import Stats from './pages/Stats'
+import ShareAccess from './pages/ShareAccess'
 
 function App() {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -28,6 +29,9 @@ function App() {
 
       <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} />
       <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/dashboard" />} />
+
+      {/* Public share access — reachable with or without an account */}
+      <Route path="/s/:token" element={<ShareAccess />} />
 
       {/* Authenticated app */}
       <Route path="/dashboard" element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}>

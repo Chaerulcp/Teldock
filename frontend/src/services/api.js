@@ -60,6 +60,28 @@ api.interceptors.response.use(
   }
 );
 
+// Separate axios instance for public share access.
+// It intentionally has NO auth interceptor and NO 401 -> /login redirect:
+// the public share endpoint returns 401 for a wrong password, which must be
+// shown inline to an anonymous visitor rather than bouncing them to /login.
+const publicApi = axios.create({
+  baseURL: '/api',
+});
+
+// Public share API calls
+export const publicShareApi = {
+  get: (token, password) =>
+    publicApi.get(`/files/s/${encodeURIComponent(token)}`, {
+      headers: password ? { 'X-Share-Password': password } : {},
+    }),
+  download: (token, password) =>
+    publicApi.get(`/files/s/${encodeURIComponent(token)}`, {
+      params: { download: true },
+      headers: password ? { 'X-Share-Password': password } : {},
+      responseType: 'blob',
+    }),
+};
+
 // Auth API calls
 export const authApi = {
   register: (data) => api.post('/auth/register', data),

@@ -11,10 +11,11 @@ serta channel Telegram Anda terhubung. Jika belum, mulai dari
 
 ## Masuk ke akun
 
-Teldock menggunakan akun email dan password. Frontend menyediakan dua rute publik:
+Teldock menggunakan akun email dan password. Frontend menyediakan tiga rute publik:
 
 - `/register` — membuat akun.
 - `/login` — masuk.
+- `/s/:token` — membuka tautan file yang dibagikan (bekerja tanpa login). Lihat [Berbagi File](/id/guide/sharing).
 
 Setelah berhasil login Anda diarahkan ke `/dashboard`. Access token berumur pendek dan
 diperbarui otomatis di latar belakang, sehingga Anda tetap masuk sampai keluar sendiri atau

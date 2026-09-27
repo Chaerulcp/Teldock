@@ -37,7 +37,7 @@ Daftar ini disusun dari `backend/.env.example` dan dari setiap pembacaan `proces
 | `TG_PART_SIZE` | `18874368` (~18 MB) | Tidak | Jumlah byte per potongan saat mengunggah ke Telegram. Dipakai di `telegram-storage.service.js`. |
 | `MAX_UPLOAD_BYTES` | `2147483648` (2 GB) | Tidak | Ukuran unggahan maksimum yang diterima. Dipakai oleh jalur unggah HTTP dan WebDAV. |
 | `WEBDAV_RATE_LIMIT_MAX` | `5000` | Tidak | Jumlah request yang diizinkan per 15 menit pada router `/webdav`. Percobaan autentikasi yang gagal dibatasi terpisah sebanyak 20 per 15 menit. |
-| `FRONTEND_URL` | *(kosong)* | Tidak | Base URL untuk membentuk tautan pendek share (misalnya `<FRONTEND_URL>/s/<token>`). Dibaca di `SharedLink`, `share.controller.js`, dan `file-management.service.js`, tetapi **tidak ada di `.env.example`** — tambahkan bila ingin URL share absolut. |
+| `FRONTEND_URL` | `http://localhost:3000` | Tidak | Base URL untuk membentuk tautan pendek share absolut (misalnya `<FRONTEND_URL>/s/<token>`). Dibaca di `SharedLink`, `share.controller.js`, dan `file-management.service.js`. Setel ke origin frontend publik Anda di produksi; tanpa itu, tautan share dikembalikan sebagai path relatif. |
 
 ## Contoh `.env`
 

@@ -11,10 +11,11 @@ bot and channel are connected. If you have not done that yet, start with
 
 ## Signing in
 
-Teldock uses an email and password account. The frontend exposes two public routes:
+Teldock uses an email and password account. The frontend exposes three public routes:
 
 - `/register` — create an account.
 - `/login` — sign in.
+- `/s/:token` — open a shared file link (works without signing in). See [Sharing Files](/guide/sharing).
 
 After a successful login you land on `/dashboard`. Access tokens are short-lived and are
 refreshed in the background, so you stay signed in until you sign out or the refresh token
