@@ -261,12 +261,12 @@ REDIS_PORT=6379
 
 ### Folders — `/api/folders`
 
-| Method   | Endpoint           | Auth   | Description                 |
-| -------- | ------------------ | ------ | --------------------------- |
-| `GET`    | `/folders?parent=` | Bearer | List folders under a parent |
-| `POST`   | `/folders`         | Bearer | Create a folder             |
-| `PUT`    | `/folders/:id`     | Bearer | Rename a folder             |
-| `DELETE` | `/folders/:id`     | Bearer | Delete a folder             |
+| Method   | Endpoint                       | Auth   | Description                 |
+| -------- | ------------------------------ | ------ | --------------------------- |
+| `GET`    | `/folders?parentFolderId=`     | Bearer | List folders under a parent |
+| `POST`   | `/folders`                     | Bearer | Create a folder             |
+| `PUT`    | `/folders/:id`                 | Bearer | Rename a folder             |
+| `DELETE` | `/folders/:id`                 | Bearer | Delete a folder             |
 
 ### Telegram Integration — `/api/user`
 
