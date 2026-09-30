@@ -28,10 +28,10 @@ The list is derived from `backend/.env.example` and from every `process.env.*` r
 | `ENCRYPTION_KEY` | *(none)* | Yes | Encrypts per-user Telegram credentials at rest and optional file encryption. At least 32 characters, not a placeholder. Validated at boot. Keep it stable. |
 | `TELEGRAM_BOT_TOKEN` | *(none)* | Dev only | Fallback bot token used only when `NODE_ENV` is not `production`, for local development and testing. Not a production multi-user fallback. |
 | `TELEGRAM_STORAGE_CHAT_ID` | *(none)* | Dev only | Fallback storage channel ID used only when `NODE_ENV` is not `production`. |
-| `TELEGRAM_API_URL` | `https://api.telegram.org/bot<token>` | No | Base URL for the Telegram Bot API. Present in `.env.example`; the current code calls `https://api.telegram.org` directly, so this is reserved for a public or local Bot API server. |
-| `TELEGRAM_API_SERVER_URL` | `http://localhost:8081` | No | URL of a local Telegram Bot API server. Reserved; not read by the current code. |
-| `REDIS_HOST` | `localhost` | No | Host for the optional preview-generation queue. Not required to run Teldock. |
-| `REDIS_PORT` | `6379` | No | Port for the optional Redis instance. |
+| `TELEGRAM_API_URL` | `https://api.telegram.org/bot<token>` | No | Not read by the code. Present in `.env.example` for a future public or local Bot API server, but the backend calls `https://api.telegram.org` directly (hardcoded in `telegram-storage.service.js`), so setting this has no effect. |
+| `TELEGRAM_API_SERVER_URL` | `http://localhost:8081` | No | Not read by the code. Present in `.env.example` only; setting it has no effect. |
+| `REDIS_HOST` | `localhost` | No | Not read by the code. Teldock has no Redis dependency and no preview queue; previews are generated in-process (see `backend/src/routes/preview.routes.js`). Setting this has no effect. |
+| `REDIS_PORT` | `6379` | No | Not read by the code. Present in `.env.example` only; setting it has no effect. |
 | `CORS_ORIGIN` | `http://localhost:3000` | No | Allowed browser origin. Must match the frontend origin exactly; set it explicitly in production. |
 | `BCRYPT_ROUNDS` | `12` | No | Password-hashing cost factor. Read by `backend/src/config/security.js`; values outside 4–15 fall back to `12` with a warning. |
 | `TG_PART_SIZE` | `18874368` (~18 MB) | No | Bytes per chunk when uploading to Telegram. Used in `telegram-storage.service.js`. |
@@ -68,17 +68,11 @@ ENCRYPTION_KEY=<generate-random-secret>
 # Telegram (local dev/testing only — production users connect their own bot in Settings)
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_STORAGE_CHAT_ID=
-TELEGRAM_API_URL=https://api.telegram.org/botYOUR_BOT_TOKEN
-TELEGRAM_API_SERVER_URL=http://localhost:8081
 
 # Storage / uploads
 TG_PART_SIZE=18874368
 MAX_UPLOAD_BYTES=2147483648
 WEBDAV_RATE_LIMIT_MAX=5000
-
-# Optional services
-REDIS_HOST=localhost
-REDIS_PORT=6379
 
 # Security
 BCRYPT_ROUNDS=12
@@ -100,10 +94,10 @@ The database connection variables (`DB_HOST`, `DB_NAME`, `DB_USER`, and `DB_PASS
 
 Optional in all environments:
 
-- `REDIS_HOST` / `REDIS_PORT` — only needed for the preview-generation queue.
 - `BCRYPT_ROUNDS` — password-hashing cost factor (4–15; defaults to `12`).
-- `TELEGRAM_API_URL`, `TELEGRAM_API_SERVER_URL` — documented but not read by the current code.
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_STORAGE_CHAT_ID` — development/testing fallbacks only.
+
+The following variables appear in `backend/.env.example` but are not read by the code, so they have no effect and can be omitted: `TELEGRAM_API_URL`, `TELEGRAM_API_SERVER_URL`, `REDIS_HOST`, `REDIS_PORT`.
 
 ## See also
 

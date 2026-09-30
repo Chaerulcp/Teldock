@@ -52,7 +52,7 @@ Teldock memakai Sequelize dengan MySQL/MariaDB. Isi `DB_HOST`, `DB_PORT`, `DB_NA
 
 `TELEGRAM_BOT_TOKEN` dan `TELEGRAM_STORAGE_CHAT_ID` hanya untuk kemudahan pengembangan dan pengujian lokal. Pada operasi multi-user normal, setiap akun menghubungkan bot dan channel-nya sendiri di Settings — lihat [Menghubungkan Telegram](/id/guide/telegram-setup).
 
-`TELEGRAM_API_URL` dan `TELEGRAM_API_SERVER_URL` disediakan untuk mengarahkan ke server Telegram Bot API publik atau lokal. Kode saat ini memanggil `https://api.telegram.org` secara langsung, jadi biarkan nilai default kecuali Anda menjalankan Bot API server kustom.
+`TELEGRAM_API_URL` dan `TELEGRAM_API_SERVER_URL` tidak dibaca oleh kode. Backend memanggil `https://api.telegram.org` secara langsung (hardcoded di `backend/src/services/telegram-storage.service.js`), jadi mengisi variabel ini tidak berpengaruh.
 
 ## Enkripsi
 
@@ -62,9 +62,9 @@ Teldock memakai Sequelize dengan MySQL/MariaDB. Isi `DB_HOST`, `DB_PORT`, `DB_NA
 Mengubah `ENCRYPTION_KEY` setelah ada data membuat kredensial dan file yang sudah terenkripsi tidak dapat dibaca. Tetapkan sekali, cadangkan, dan jangan merotasinya sembarangan.
 :::
 
-## Redis
+## Redis (tidak dipakai)
 
-`REDIS_HOST` dan `REDIS_PORT` didokumentasikan untuk antrean pembuatan preview yang opsional. Redis tidak wajib untuk menjalankan Teldock; biarkan nilai default jika tidak memakainya.
+Teldock tidak memakai Redis. `REDIS_HOST` dan `REDIS_PORT` ada di `backend/.env.example` tetapi tidak dibaca oleh kode, sehingga tidak berpengaruh. Tidak ada antrean preview: preview dihasilkan di dalam proses saat diminta (lihat `backend/src/routes/preview.routes.js`).
 
 ## Keamanan
 
@@ -79,7 +79,8 @@ Nilai terkait penyimpanan:
 | --- | --- |
 | `TG_PART_SIZE` | Jumlah byte per potongan saat mengunggah ke Telegram (default `18874368`, sekitar 18 MB). |
 | `MAX_UPLOAD_BYTES` | Ukuran unggahan maksimum yang diterima (default `2147483648`, 2 GB). |
-| `FRONTEND_URL` | Base URL untuk membentuk tautan pendek share. Dipakai di kode tetapi tidak ada di `.env.example`. |
+| `WEBDAV_RATE_LIMIT_MAX` | Jumlah request yang diizinkan per 15 menit pada router `/webdav` (default `5000`). Percobaan autentikasi yang gagal dibatasi terpisah sebanyak 20 per 15 menit. |
+| `FRONTEND_URL` | Base URL untuk membentuk tautan pendek share (misalnya `<FRONTEND_URL>/s/<token>`). Dibaca di `SharedLink`, `share.controller.js`, dan `file-management.service.js`; tanpa itu, tautan share dikembalikan sebagai path relatif. |
 
 ## Membuat secret yang kuat
 

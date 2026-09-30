@@ -192,12 +192,6 @@ File.prototype.incrementDownload = async function() {
 };
 
 File.prototype.generatePublicToken = async function() {
-    const tokenData = {
-        fileId: this.id,
-        purpose: 'share',
-        createdAt: Date.now()
-    };
-    
     const token = crypto.randomBytes(32).toString('hex');
     this.sharedToken = token;
     await this.save();

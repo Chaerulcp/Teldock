@@ -52,7 +52,7 @@ Teldock uses Sequelize against MySQL/MariaDB. Set `DB_HOST`, `DB_PORT`, `DB_NAME
 
 `TELEGRAM_BOT_TOKEN` and `TELEGRAM_STORAGE_CHAT_ID` are conveniences for local development and testing only. In normal multi-user operation, each account connects its own bot and channel in Settings — see [Connecting Telegram](/guide/telegram-setup).
 
-`TELEGRAM_API_URL` and `TELEGRAM_API_SERVER_URL` are reserved for pointing at a public or local Telegram Bot API server. The current code calls `https://api.telegram.org` directly, so leave these at their defaults unless you are running a custom Bot API server.
+`TELEGRAM_API_URL` and `TELEGRAM_API_SERVER_URL` are not read by the code. The backend calls `https://api.telegram.org` directly (hardcoded in `backend/src/services/telegram-storage.service.js`), so setting these variables has no effect.
 
 ## Encryption
 
@@ -62,9 +62,9 @@ Teldock uses Sequelize against MySQL/MariaDB. Set `DB_HOST`, `DB_PORT`, `DB_NAME
 Changing `ENCRYPTION_KEY` after data exists makes previously encrypted credentials and files unreadable. Set it once, back it up, and never rotate it casually.
 :::
 
-## Redis
+## Redis (not used)
 
-`REDIS_HOST` and `REDIS_PORT` are documented for the optional preview-generation queue. Redis is not required to run Teldock; leave the defaults if you are not using it.
+Teldock does not use Redis. `REDIS_HOST` and `REDIS_PORT` are present in `backend/.env.example` but are not read by the code, so they have no effect. There is no preview queue: previews are generated in-process on demand (see `backend/src/routes/preview.routes.js`).
 
 ## Security
 
@@ -79,7 +79,8 @@ Additional storage-related values:
 | --- | --- |
 | `TG_PART_SIZE` | Bytes per chunk when uploading to Telegram (default `18874368`, about 18 MB). |
 | `MAX_UPLOAD_BYTES` | Maximum accepted upload size (default `2147483648`, 2 GB). |
-| `FRONTEND_URL` | Base URL used to build share short links. Used in code but not present in `.env.example`. |
+| `WEBDAV_RATE_LIMIT_MAX` | Requests allowed per 15 minutes on the `/webdav` router (default `5000`). Failed authentication attempts are capped separately at 20 per 15 minutes. |
+| `FRONTEND_URL` | Base URL used to build share short links (for example `<FRONTEND_URL>/s/<token>`). Read in `SharedLink`, `share.controller.js` and `file-management.service.js`; without it, share links are returned as relative paths. |
 
 ## Generating strong secrets
 

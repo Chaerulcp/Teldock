@@ -17,8 +17,8 @@ Deployment self-hosted yang umum terdiri dari empat komponen:
               HTTPS                        HTTP
 Browser  ─────────────▶  Nginx  ─────────────▶  Node API (:3001)  ──▶  Telegram Bot API
                           │                              │
-                          │  file statis                 ├──▶  MySQL (:3306)
-                          │  /api  ──▶ API               └──▶  Redis (:6379, opsional)
+                          │  file statis                 └──▶  MySQL (:3306)
+                          │  /api  ──▶ API
                           │  /socket.io  ──▶ WebSocket
                           └  /webdav  ──▶ API
 ```
@@ -26,7 +26,6 @@ Browser  ─────────────▶  Nginx  ──────�
 - **Nginx** menyajikan frontend hasil build dan meneruskan trafik API, WebSocket, serta WebDAV.
 - **Node API** menjalankan aplikasi Express (entry point `backend/server.js`).
 - **MySQL / MariaDB** hanya menyimpan metadata.
-- **Redis** bersifat opsional (antrean preview).
 
 ::: info
 Byte file tidak pernah disimpan di disk server. Database menyimpan metadata dan referensi pesan
@@ -40,7 +39,6 @@ Telegram; isi file berada di channel Telegram milik masing-masing pengguna.
 - Nginx
 - Nama domain (disarankan) dan akses untuk membuka port 80 dan 443
 - Process manager: `systemd` atau PM2
-- Opsional: Redis dan FFmpeg (thumbnail video)
 
 ## Penyiapan backend produksi
 

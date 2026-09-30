@@ -28,10 +28,10 @@ Daftar ini disusun dari `backend/.env.example` dan dari setiap pembacaan `proces
 | `ENCRYPTION_KEY` | *(tidak ada)* | Ya | Mengenkripsi kredensial Telegram per pengguna saat disimpan dan enkripsi file opsional. Minimal 32 karakter, bukan placeholder. Divalidasi saat boot. Jaga agar tetap stabil. |
 | `TELEGRAM_BOT_TOKEN` | *(tidak ada)* | Dev saja | Token bot fallback yang hanya dipakai saat `NODE_ENV` bukan `production`, untuk pengembangan dan pengujian lokal. Bukan fallback produksi multi-user. |
 | `TELEGRAM_STORAGE_CHAT_ID` | *(tidak ada)* | Dev saja | Chat ID channel penyimpanan fallback yang hanya dipakai saat `NODE_ENV` bukan `production`. |
-| `TELEGRAM_API_URL` | `https://api.telegram.org/bot<token>` | Tidak | Base URL untuk Telegram Bot API. Ada di `.env.example`; kode saat ini memanggil `https://api.telegram.org` secara langsung, jadi ini disediakan untuk Bot API server publik atau lokal. |
-| `TELEGRAM_API_SERVER_URL` | `http://localhost:8081` | Tidak | URL untuk Telegram Bot API server lokal. Disediakan; belum dibaca kode saat ini. |
-| `REDIS_HOST` | `localhost` | Tidak | Host untuk antrean pembuatan preview yang opsional. Tidak wajib untuk menjalankan Teldock. |
-| `REDIS_PORT` | `6379` | Tidak | Port untuk instance Redis opsional. |
+| `TELEGRAM_API_URL` | `https://api.telegram.org/bot<token>` | Tidak | Tidak dibaca oleh kode. Ada di `.env.example` untuk Bot API server publik atau lokal di masa depan, tetapi backend memanggil `https://api.telegram.org` secara langsung (hardcoded di `telegram-storage.service.js`), jadi mengisinya tidak berpengaruh. |
+| `TELEGRAM_API_SERVER_URL` | `http://localhost:8081` | Tidak | Tidak dibaca oleh kode. Hanya ada di `.env.example`; mengisinya tidak berpengaruh. |
+| `REDIS_HOST` | `localhost` | Tidak | Tidak dibaca oleh kode. Teldock tidak memiliki dependensi Redis maupun antrean preview; preview dihasilkan di dalam proses (lihat `backend/src/routes/preview.routes.js`). Mengisinya tidak berpengaruh. |
+| `REDIS_PORT` | `6379` | Tidak | Tidak dibaca oleh kode. Hanya ada di `.env.example`; mengisinya tidak berpengaruh. |
 | `CORS_ORIGIN` | `http://localhost:3000` | Tidak | Origin browser yang diizinkan. Harus persis sama dengan origin frontend; tetapkan secara eksplisit di produksi. |
 | `BCRYPT_ROUNDS` | `12` | Tidak | Faktor biaya hashing password. Dibaca oleh `backend/src/config/security.js`; nilai di luar rentang 4–15 akan kembali ke `12` disertai peringatan. |
 | `TG_PART_SIZE` | `18874368` (~18 MB) | Tidak | Jumlah byte per potongan saat mengunggah ke Telegram. Dipakai di `telegram-storage.service.js`. |
@@ -68,17 +68,11 @@ ENCRYPTION_KEY=<generate-random-secret>
 # Telegram (local dev/testing only — production users connect their own bot in Settings)
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_STORAGE_CHAT_ID=
-TELEGRAM_API_URL=https://api.telegram.org/botYOUR_BOT_TOKEN
-TELEGRAM_API_SERVER_URL=http://localhost:8081
 
 # Storage / uploads
 TG_PART_SIZE=18874368
 MAX_UPLOAD_BYTES=2147483648
 WEBDAV_RATE_LIMIT_MAX=5000
-
-# Optional services
-REDIS_HOST=localhost
-REDIS_PORT=6379
 
 # Security
 BCRYPT_ROUNDS=12
@@ -100,10 +94,10 @@ Variabel koneksi database (`DB_HOST`, `DB_NAME`, `DB_USER`, dan `DB_PASSWORD` bi
 
 Opsional di semua lingkungan:
 
-- `REDIS_HOST` / `REDIS_PORT` — hanya diperlukan untuk antrean pembuatan preview.
 - `BCRYPT_ROUNDS` — faktor biaya hashing password (4–15; default `12`).
-- `TELEGRAM_API_URL`, `TELEGRAM_API_SERVER_URL` — didokumentasikan tetapi belum dibaca kode saat ini.
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_STORAGE_CHAT_ID` — hanya fallback pengembangan/pengujian.
+
+Variabel berikut ada di `backend/.env.example` tetapi tidak dibaca oleh kode, sehingga tidak berpengaruh dan boleh dihilangkan: `TELEGRAM_API_URL`, `TELEGRAM_API_SERVER_URL`, `REDIS_HOST`, `REDIS_PORT`.
 
 ## Lihat juga
 

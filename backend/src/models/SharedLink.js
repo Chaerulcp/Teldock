@@ -1,6 +1,7 @@
 const { DataTypes, Op } = require("sequelize");
 const { sequelize } = require("../config/database");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const secrets = require("../config/secrets");
 
 const SharedLink = sequelize.define(
@@ -187,11 +188,17 @@ SharedLink.createLink = async function (fileId, creatorId, options = {}) {
     allowPreview = true,
   } = options;
 
-  // Generate token using JWT
+  // Generate token using JWT.
+  //
+  // `jti` is a random nonce and must stay. Without it, two links created for
+  // the same file within the same second produce byte-identical tokens (the
+  // payload would be only fileId/creatorId/purpose/iat/exp), which collides
+  // with the unique constraint on `token` and fails the second request.
   const tokenData = {
     fileId,
     creatorId,
     purpose: "share",
+    jti: crypto.randomUUID(),
     iat: Math.floor(Date.now() / 1000),
   };
 

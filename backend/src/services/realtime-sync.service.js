@@ -30,7 +30,7 @@ class RealTimeSyncService {
                 socket.userId = decoded.userId;
                 
                 next();
-            } catch (error) {
+            } catch {
                 next(new Error('Invalid token'));
             }
         });

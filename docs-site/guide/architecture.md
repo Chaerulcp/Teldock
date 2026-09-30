@@ -14,7 +14,6 @@ flowchart LR
     SPA["React SPA<br/>(Vite + Tailwind)"] -->|REST / JSON| API["Express REST API<br/>(Node.js + JWT)"]
     API -->|sendDocument / getFile| TG["Telegram Bot API<br/>Private Channel"]
     API --> DB["MySQL / MariaDB<br/>(Sequelize)"]
-    API --> RD["Redis<br/>(optional)"]
     API -.->|Socket.IO events| SPA
 ```
 
@@ -22,7 +21,6 @@ flowchart LR
 - The **Express API** authenticates requests, validates input, and orchestrates storage.
 - **Telegram** holds the actual file bytes, one document per part.
 - **MySQL / MariaDB** stores metadata through Sequelize models.
-- **Redis** is optional and used for caching and queueing.
 - **Socket.IO** pushes realtime events (file changes, upload progress) back to the SPA.
 
 ## Backend layers
@@ -73,7 +71,7 @@ Supporting concerns live alongside these layers: `middleware/` for auth and uplo
 | Part references | `files` and `file_parts` rows holding Telegram chat, message, and file IDs. |
 | Encryption parameters | Salt and per-part IV stored with the file and its parts. |
 | Credentials | Bot tokens and channel IDs encrypted at rest, never returned to clients. |
-| Transient data | Optional Redis cache/queue. |
+| Transient data | Held in process memory (bot pool, Socket.IO). No external cache or queue. |
 
 Chunk size is controlled by `TG_PART_SIZE` (default `18874368` bytes, about 18 MB). Uploads are bounded by `MAX_UPLOAD_BYTES` (default 2 GB). Because only one part is held in memory at a time, a multi-gigabyte upload does not inflate process memory.
 

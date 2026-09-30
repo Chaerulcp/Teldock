@@ -17,8 +17,8 @@ A typical self-hosted deployment has four moving parts:
               HTTPS                        HTTP
 Browser  ─────────────▶  Nginx  ─────────────▶  Node API (:3001)  ──▶  Telegram Bot API
                           │                              │
-                          │  static files                ├──▶  MySQL (:3306)
-                          │  /api  ──▶ API               └──▶  Redis (:6379, optional)
+                          │  static files                └──▶  MySQL (:3306)
+                          │  /api  ──▶ API
                           │  /socket.io  ──▶ WebSocket
                           └  /webdav  ──▶ API
 ```
@@ -26,7 +26,6 @@ Browser  ─────────────▶  Nginx  ──────�
 - **Nginx** serves the built frontend and reverse-proxies API, WebSocket, and WebDAV traffic.
 - **Node API** runs the Express application (entry point `backend/server.js`).
 - **MySQL / MariaDB** stores metadata only.
-- **Redis** is optional (preview queue).
 
 ::: info
 File bytes are never stored on the server disk. The database holds metadata and Telegram message
@@ -40,7 +39,6 @@ references; the content lives in each user's own Telegram channel.
 - Nginx
 - A domain name (recommended) and the ability to open ports 80 and 443
 - A process manager: `systemd` or PM2
-- Optional: Redis and FFmpeg (video thumbnails)
 
 ## Backend production setup
 

@@ -1,15 +1,5 @@
 require('dotenv').config();
-const {
-    sequelize,
-    User,
-    Folder,
-    File,
-    SharedLink,
-    TelegramConfig,
-    FileVersion,
-    FilePart,
-    BotToken
-} = require('../src/models');
+const { sequelize } = require('../src/models');
 
 async function runMigrations() {
     try {

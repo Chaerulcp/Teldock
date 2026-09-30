@@ -1,11 +1,7 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 const crypto = require('crypto');
-const bcrypt = require('bcryptjs');
 const secrets = require('../config/secrets');
-
-const SECRET_LENGTH = 32; // Bytes
-const ITERATIONS = 100000; // Salt rounds for hashing token
 
 /**
  * Encrypt a value using AES-256-CBC
@@ -113,7 +109,7 @@ TelegramConfig.prototype.decryptToken = async function() {
     return decrypt(parts[0], parts[1]);
 };
 
-TelegramConfig.validateCredentials = async function(botToken, chatId) {
+TelegramConfig.validateCredentials = async function(botToken, _chatId) {
     try {
         // Test connection to verify credentials
         const testResult = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);

@@ -27,7 +27,6 @@ const TEST_PASSWORD = 'TestPass123!';
 
 // Auth variables (will be populated during login)
 let accessToken = null;
-let userId = null;
 
 async function registerUser() {
     log('\n📝 1. Creating test user...', colors.blue);
@@ -70,7 +69,6 @@ async function login() {
         if (response.data.success) {
             log('✅ Login successful!', colors.green);
             accessToken = response.data.data.accessToken;
-            userId = response.data.data.user.id;
             return response.data.data.accessToken;
         }
     } catch (error) {
@@ -99,19 +97,19 @@ async function getProfile() {
     }
 }
 
-async function testFolders(token) {
+async function testFolders(_token) {
     // Folders not implemented yet - skip
     log('\n📁 4. Testing folders...', colors.blue);
     log('⏳ Folder endpoints coming in next phase...', colors.yellow);
 }
 
-async function testFiles(token) {
+async function testFiles(_token) {
     // Files upload/download not implemented yet - skip
     log('\n📄 5. Testing file operations...', colors.blue);
     log('⏳ File upload/download endpoints coming in next phase...', colors.yellow);
 }
 
-async function testSharedLinks(token) {
+async function testSharedLinks(_token) {
     // Shared links not implemented yet - skip
     log('\n🔗 6. Testing shared links...', colors.blue);
     log('⏳ Shared link endpoints coming in next phase...', colors.yellow);

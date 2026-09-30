@@ -14,7 +14,6 @@ flowchart LR
     SPA["React SPA<br/>(Vite + Tailwind)"] -->|REST / JSON| API["Express REST API<br/>(Node.js + JWT)"]
     API -->|sendDocument / getFile| TG["Telegram Bot API<br/>Channel Privat"]
     API --> DB["MySQL / MariaDB<br/>(Sequelize)"]
-    API --> RD["Redis<br/>(opsional)"]
     API -.->|event Socket.IO| SPA
 ```
 
@@ -22,7 +21,6 @@ flowchart LR
 - **Express API** mengautentikasi permintaan, memvalidasi input, dan mengatur penyimpanan.
 - **Telegram** menyimpan byte file sebenarnya, satu dokumen per bagian.
 - **MySQL / MariaDB** menyimpan metadata melalui model Sequelize.
-- **Redis** bersifat opsional dan dipakai untuk cache serta queue.
 - **Socket.IO** mendorong event realtime (perubahan file, progres upload) kembali ke SPA.
 
 ## Lapisan backend
@@ -73,7 +71,7 @@ Kebutuhan pendukung berada di samping lapisan tersebut: `middleware/` untuk auth
 | Referensi bagian | Baris `files` dan `file_parts` yang menyimpan chat, message, dan file ID Telegram. |
 | Parameter enkripsi | Salt dan IV per bagian disimpan bersama file dan bagian-bagiannya. |
 | Kredensial | Token bot dan ID channel terenkripsi, tidak pernah dikembalikan ke klien. |
-| Data sementara | Cache/queue Redis opsional. |
+| Data sementara | Disimpan di memori proses (bot pool, Socket.IO). Tanpa cache atau queue eksternal. |
 
 Ukuran chunk diatur oleh `TG_PART_SIZE` (default `18874368` byte, sekitar 18 MB). Unggahan dibatasi oleh `MAX_UPLOAD_BYTES` (default 2 GB). Karena hanya satu bagian yang ditahan di memori pada satu waktu, unggahan berukuran beberapa gigabyte tidak membengkakkan memori proses.
 

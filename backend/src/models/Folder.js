@@ -1,5 +1,4 @@
 const { DataTypes, Op } = require('sequelize');
-const crypto = require('crypto');
 const { sequelize } = require('../config/database');
 
 const Folder = sequelize.define('Folder', {

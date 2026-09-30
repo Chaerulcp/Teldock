@@ -69,7 +69,7 @@ npm run migrate
 
 ## Environment Variables
 
-### Required in `backend/.env`
+### Common in `backend/.env`
 
 ```bash
 NODE_ENV=production        # development or production
@@ -84,15 +84,13 @@ JWT_SECRET=<random-48chars>     # JWT signing secret (REQUIRED)
 JWT_EXPIRE=15m                 # Token expiration
 REFRESH_TOKEN_SECRET=<random>  # Refresh token secret (REQUIRED)
 REFRESH_TOKEN_EXPIRE=7d        # Refresh token expiration
+FILE_ACCESS_TOKEN_EXPIRE=5m    # Lifetime of signed preview/download URLs
 ENCRYPTION_KEY=<random-32chars>   # Encryption key (REQUIRED)
 
 TG_PART_SIZE=18874368            # ~18MB part size
 MAX_UPLOAD_BYTES=2147483648      # 2GB max upload
 CORS_ORIGIN=http://localhost:3000  # Allowed origins
-
-# Optional: Redis for preview queue
-REDIS_HOST=localhost
-REDIS_PORT=6379
+WEBDAV_RATE_LIMIT_MAX=5000       # WebDAV requests per 15 min (default 5000)
 ```
 
 **Generate secrets:**
@@ -225,10 +223,15 @@ Or direct download:
 https://yourdomain.com/s/JWT_TOKEN_HERE?download=true
 ```
 
-With password protection:
+With password protection, send the password in the `X-Share-Password` header
+(there is no query-string alternative):
+```bash
+curl -H "X-Share-Password: YOURPASSWORD" \
+  "https://yourdomain.com/s/JWT_TOKEN_HERE?download=true"
 ```
-https://yourdomain.com/s/JWT_TOKEN_HERE?password=YOURPASSWORD&download=true
-```
+
+Requesting a protected link without the header returns `200` with
+`requiresPassword: true`; a wrong password returns `401`.
 
 ### JWT Token Validation
 

@@ -29,8 +29,6 @@ Complete guides for deploying **Teldock** in various production environments. Wh
 - [ ] Domain name configured (optional but recommended)
 - [ ] SSL certificates ready (or using Let's Encrypt)
 - [ ] MySQL/MariaDB server accessible
-- [ ] Redis server (optional, for preview queue)
-- [ ] FFmpeg installed (optional, for video thumbnails)
 - [ ] Bot tokens prepared for each user
 
 ### Security Requirements
@@ -315,7 +313,6 @@ services:
       - "3001:3001"
     depends_on:
       - database
-      - redis
     environment:
       NODE_ENV: production
       DB_HOST: database
@@ -330,8 +327,6 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       TG_PART_SIZE: 18874368
       MAX_UPLOAD_BYTES: 2147483648
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
       CORS_ORIGIN: http://localhost:3000
     command: sh -c "cd /app/backend && npm install && npm run migrate && npm start"
     networks:
@@ -356,23 +351,12 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis (optional, for preview queue)
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-    networks:
-      - teldock
-
 networks:
   teldock:
     driver: bridge
 
 volumes:
   mysql_data:
-  redis_data:
 ```
 
 ### .env file for Docker
@@ -1080,10 +1064,6 @@ curl -X POST "https://api.telegram.org/bot<TOKEN>/getUpdates"
 ```bash
 # PM2 cluster mode (already configured)
 pm2 scale teldock-api 4 --max-memory-restart 1G
-
-# Redis for sessions/cache
-redis-cli CONFIG SET maxmemory 512mb
-redis-cli CONFIG SET maxmemory-policy allkeys-lru
 
 # MySQL buffer pool tuning
 # Adjust based on server RAM

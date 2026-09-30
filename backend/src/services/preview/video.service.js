@@ -154,7 +154,7 @@ class VideoPreviewService {
     try {
       await fs.mkdir(tempDir, { recursive: true });
       return tempDir;
-    } catch (error) {
+    } catch {
       // Directory exists or already created
       return tempDir;
     }

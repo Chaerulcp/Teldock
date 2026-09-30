@@ -38,7 +38,7 @@ async function basicAuth(req, res, next) {
         }
         req.davUser = user;
         next();
-    } catch (err) {
+    } catch {
         res.setHeader('WWW-Authenticate', 'Basic realm="TeleStorage WebDAV"');
         return res.status(401).send('Authentication failed');
     }

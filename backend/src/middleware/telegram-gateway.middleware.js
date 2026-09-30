@@ -37,7 +37,7 @@ async function optionalTelegramConnection(req, res, next) {
         
         req.telegramConfig = telegramConfig || null;
         next();
-    } catch (error) {
+    } catch {
         req.telegramConfig = null;
         next();
     }

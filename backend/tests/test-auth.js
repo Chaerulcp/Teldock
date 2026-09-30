@@ -32,7 +32,7 @@ async function testHealth() {
             log('❌ Health check failed', colors.red);
             return false;
         }
-    } catch (error) {
+    } catch {
         log('❌ Unable to connect to server', colors.red);
         return false;
     }

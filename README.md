@@ -45,7 +45,7 @@ Teldock turns a Telegram bot and a private channel into a personal cloud drive. 
 
 ### Why This Design
 
-- **Minimal server storage** — only the database and optional cache live on your disk.
+- **Minimal server storage** — only the database lives on your disk.
 - **Bandwidth offload** — file transfer is handled by Telegram's infrastructure.
 - **Per-user isolation** — each account stores content in its own channel with its own credentials.
 - **Large-file support** — chunking removes the practical per-file size ceiling.
@@ -95,14 +95,12 @@ Teldock turns a Telegram bot and a private channel into a personal cloud drive. 
 │   (Vite + Tailwind) │ ◀── │   (Node.js + JWT)     │ ◀── │   Private Channel    │
 └─────────────────────┘     └───────────┬───────────┘     └─────────────────────┘
              ▲                           │
-             │  WebSocket (events)       ├───────────────┐
-             └───────────────────────────┤               │
-                                         ▼               ▼
-                                 ┌──────────────┐  ┌──────────────┐
-                                 │  MySQL /     │  │  Redis        │
-                                 │  MariaDB     │  │  (optional)   │
-                                 │  (Sequelize) │  └──────────────┘
-                                 └──────────────┘
+             │  WebSocket (events)       ▼
+             └───────────────┌──────────────┐
+                             │  MySQL /     │
+                             │  MariaDB     │
+                             │  (Sequelize) │
+                             └──────────────┘
 ```
 
 The backend follows a layered architecture with clear separation of concerns:
@@ -128,8 +126,7 @@ routes → controllers → services → models
 | **Authentication**   | JSON Web Tokens (access + refresh)                  |
 | **Validation**       | Zod schema validation                               |
 | **Real-time sync**   | Socket.IO WebSocket channel                         |
-| **Media processing** | Sharp (images), FFmpeg (video thumbnails)           |
-| **Cache / queue**    | Redis (optional)                                    |
+| **Media processing** | Sharp (image previews)                              |
 | **Frontend**         | React 18, Vite, Tailwind CSS, Zustand, React Router |
 
 ---
@@ -140,7 +137,6 @@ routes → controllers → services → models
 
 - **Node.js** 22.x or newer
 - **MySQL** or **MariaDB** 8.0+
-- Optional: **Redis** and **FFmpeg** (for video thumbnails)
 - Each end user needs their own **Telegram bot** (via [@BotFather](https://t.me/BotFather)) and a private channel
 
 ### Installation
@@ -206,10 +202,6 @@ ENCRYPTION_KEY=<generate-random-secret> # required for bot-token encryption at r
 # Storage / uploads
 TG_PART_SIZE=18874368                  # ~18 MB per part
 MAX_UPLOAD_BYTES=2147483648            # 2 GB max upload
-
-# Optional services
-REDIS_HOST=localhost
-REDIS_PORT=6379
 ```
 
 > **Note:** The server validates secrets at startup and fails fast if any required secret is missing or left at a placeholder value. Generate strong random values for `JWT_SECRET`, `REFRESH_TOKEN_SECRET`, and `ENCRYPTION_KEY`.
