@@ -1,484 +1,275 @@
-# Teldock
+<p align="center">
+  <img src="./assets/readme/hero.svg" width="100%" alt="Teldock splits a file into roughly 18 MB parts and streams them to your own private Telegram channel">
+</p>
 
-**Teldock** is an open-source, self-hosted cloud storage application that uses **Telegram's Bot API** as its storage backend. Files are split into chunks, optionally encrypted, and streamed directly to each user's own Telegram channel — keeping your server's disk usage minimal while leveraging Telegram's infrastructure for durable storage and CDN delivery.
+<p align="center">
+  <a href="https://github.com/Chaerulcp/Teldock/actions/workflows/ci.yml"><img src="https://github.com/Chaerulcp/Teldock/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="https://github.com/Chaerulcp/Teldock/releases"><img src="https://img.shields.io/badge/release-v1.1.0-blue" alt="Latest release"></a>
+  <a href="https://chaerulcp.github.io/Teldock/"><img src="https://img.shields.io/badge/docs-EN%20%2F%20ID-10b981" alt="Documentation"></a>
+  <img src="https://img.shields.io/badge/Node.js-22.x-339933?logo=node.js&logoColor=white" alt="Node.js 22">
+  <img src="https://img.shields.io/badge/React-18.x-61DAFB?logo=react&logoColor=black" alt="React 18">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow" alt="MIT license"></a>
+</p>
 
-![Node.js](https://img.shields.io/badge/Node.js-22.x-339933?logo=node.js&logoColor=white)
-![React](https://img.shields.io/badge/React-18.x-61DAFB?logo=react&logoColor=black)
-![Express](https://img.shields.io/badge/Express-5.x-000000?logo=express&logoColor=white)
-![MySQL](https://img.shields.io/badge/MySQL%2FMariaDB-8.0+-4479A1?logo=mysql&logoColor=white)
-![CI](https://github.com/Chaerulcp/Teldock/actions/workflows/ci.yml/badge.svg)
-![License](https://img.shields.io/badge/License-MIT-yellow)
-![Release](https://img.shields.io/badge/release-v1.0.0-blue)
+**Teldock is a self-hosted cloud drive that stores your files in your own Telegram channel.** Point it at a bot you created and a private channel you own, and it becomes a browsable drive with folders, search, sharing, version history, and a WebDAV mount — while your server keeps only metadata on disk.
 
----
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Key Features](#key-features)
-- [Architecture](#architecture)
-- [Technology Stack](#technology-stack)
-- [Quick Start](#quick-start)
-- [Configuration](#configuration)
-- [API Reference](#api-reference)
-- [Security & Privacy](#security--privacy)
-- [Project Structure](#project-structure)
-- [Development](#development)
-- [Documentation](#documentation)
-- [Contributing](#contributing)
-- [License](#license)
-- [Disclaimer](#disclaimer)
+It is a free, open-source alternative to paying for object storage when you already have a Telegram account and a small VPS.
 
 ---
 
-## Overview
+## Why the files do not live on your server
 
-Teldock turns a Telegram bot and a private channel into a personal cloud drive. Your server never persists the raw file bytes — it only keeps metadata in a relational database and proxies file content to and from Telegram on demand.
+Most self-hosted drives ask you to provision a disk. Teldock inverts that: **the server never writes file bytes to disk.** It splits each upload into bounded parts, streams them to your channel, and records only the metadata needed to fetch them again.
 
-### How It Works
+| | |
+| --- | --- |
+| **Storage cost** | Your Telegram channel, not your VPS disk |
+| **Bandwidth** | Served by Telegram's infrastructure |
+| **Isolation** | Every account uses its own bot and channel — one instance can serve a whole household without mixing files |
+| **File size** | Chunking removes the practical per-file ceiling |
+| **Encryption** | Optional per-file AES-256-CTR, decided at upload time |
 
-1. Each user connects their own **Telegram bot** and **storage channel** through the Settings page.
-2. On upload, files are split into bounded parts (~18 MB) to stay within the Telegram Bot API limits.
-3. Parts are streamed to the user's channel using their bot token(s), distributed across a multi-bot pool for throughput.
-4. The database stores only metadata — filenames, part references, sizes, and encryption parameters — never raw file content.
-5. On download, parts are reassembled in order, with HTTP `Range` support for seeking and resuming.
+## Proof it works
 
-### Why This Design
+Real response from `POST /api/files/upload` on a running instance (metadata trimmed):
 
-- **Minimal server storage** — only the database lives on your disk.
-- **Bandwidth offload** — file transfer is handled by Telegram's infrastructure.
-- **Per-user isolation** — each account stores content in its own channel with its own credentials.
-- **Large-file support** — chunking removes the practical per-file size ceiling.
-
----
-
-## Key Features
-
-### Core Functionality
-
-| Feature                 | Description                                                                                 |
-| ----------------------- | ------------------------------------------------------------------------------------------- |
-| **Chunked Uploads**     | Files are split into bounded parts (~18 MB) and uploaded across a multi-bot pool.           |
-| **Streaming Downloads** | Parts are stitched back together with backpressure handling and resumable `Range` requests. |
-| **Multi-Bot Pool**      | Register multiple bot tokens per user for higher throughput via round-robin distribution.   |
-| **Version History**     | Automatic version snapshots on overwrite, with the ability to revert to a prior version.    |
-| **Soft Delete**         | Deleted files are recoverable and storage-usage accounting is kept consistent.              |
-
-### User Experience
-
-| Feature              | Description                                                                      |
-| -------------------- | -------------------------------------------------------------------------------- |
-| **Folder Structure** | Hierarchical folders with path-based navigation.                                 |
-| **Search & Filter**  | Filename search, favorites, tags, and saved "smart folder" filters.              |
-| **File Preview**     | In-browser image previews in multiple sizes (WebP-optimized), plus video thumbnails (a 640x360 JPEG frame at the 1-second mark with the duration). Video previews are capped at 25 MB, so most large videos are rejected. |
-| **Sharing**          | Public links with optional expiration, download limits, and password protection. |
-| **WebDAV Mount**     | Mount Teldock as an OS drive through the Rclone-compatible `/webdav` endpoint.   |
-
-### Security & Encryption
-
-| Feature                    | Description                                                                  |
-| -------------------------- | ---------------------------------------------------------------------------- |
-| **Signed File URLs**       | Short-lived, file-scoped signed URLs authorize preview and download streams. |
-| **AES-256-CTR Encryption** | Opt-in per-file encryption using a random salt and per-part IV.              |
-| **Encrypted Credentials**  | Bot tokens are encrypted at rest and never returned to the client.           |
-| **JWT Authentication**     | Short-lived access tokens with refresh-token rotation.                       |
-| **Input Validation**       | Request bodies are validated at the API boundary with schema validators.     |
-| **Rate Limiting**          | Global API limits plus stricter limits on the login endpoint.                |
-
----
-
-## Architecture
-
-```
-┌─────────────────────┐     ┌───────────────────────┐     ┌─────────────────────┐
-│   React SPA         │ ──▶ │   Express REST API    │ ──▶ │   Telegram Bot API   │
-│   (Vite + Tailwind) │ ◀── │   (Node.js + JWT)     │ ◀── │   Private Channel    │
-└─────────────────────┘     └───────────┬───────────┘     └─────────────────────┘
-             ▲                           │
-             │  WebSocket (events)       ▼
-             └───────────────┌──────────────┐
-                             │  MySQL /     │
-                             │  MariaDB     │
-                             │  (Sequelize) │
-                             └──────────────┘
+```json
+{
+  "success": true,
+  "data": {
+    "file": {
+      "id": "0b177935-e853-41ce-8925-f7c88feb01c3",
+      "displayFilename": "teldock-testfile.txt",
+      "mimeType": "application/octet-stream",
+      "fileSize": 91,
+      "isChunked": false,
+      "partCount": 1,
+      "isEncrypted": false
+    }
+  }
+}
 ```
 
-The backend follows a layered architecture with clear separation of concerns:
+The stored bytes came back byte-identical from Telegram via `GET /api/files/s/:token?download=true`, and the test suite covers the surrounding flows:
 
-```
-routes → controllers → services → models
-```
+| Suite | Command | Status |
+| --- | --- | --- |
+| Backend | `cd backend && npm test` | 114 passing |
+| Frontend | `cd frontend && npm test` | 12 passing |
+| End-to-end | `cd e2e && npm test` | 8 Playwright specs |
 
-- **Routes** define endpoints and attach authentication/validation middleware.
-- **Controllers** handle the HTTP request/response cycle.
-- **Services** hold business logic (Telegram gateway, chunking, streaming, previews).
-- **Models** handle persistence via Sequelize.
+## How it works
 
----
+<p align="center">
+  <img src="./assets/readme/architecture.svg" width="100%" alt="Architecture: a React SPA calls the Express API, which streams file parts to the Telegram Bot API and keeps only metadata in MySQL">
+</p>
 
-## Technology Stack
+1. You connect your own **bot token** and **private channel** in Settings. The token is encrypted at rest and never returned to a client.
+2. On upload, the file is split into parts of roughly **18 MB** (`TG_PART_SIZE`) to stay inside the Bot API limits.
+3. Parts stream to your channel through your **bot pool**, distributed round-robin when you register more than one token.
+4. MySQL stores only **metadata** — filenames, part references, sizes, and encryption parameters.
+5. On download, parts are reassembled in order with HTTP `Range` support, so transfers resume and media can be seeked.
 
-| Layer                | Technology                                          |
-| -------------------- | --------------------------------------------------- |
-| **Backend runtime**  | Node.js 22.x                                        |
-| **Web framework**    | Express 5                                           |
-| **Database**         | MySQL / MariaDB 8.0+ via Sequelize ORM              |
-| **Authentication**   | JSON Web Tokens (access + refresh)                  |
-| **Validation**       | Zod schema validation                               |
-| **Real-time sync**   | Socket.IO WebSocket channel                         |
-| **Media processing** | Sharp (image previews); FFmpeg (video previews, optional) |
-| **Frontend**         | React 18, Vite, Tailwind CSS, Zustand, React Router |
+## Quick start
 
----
-
-## Quick Start
-
-### Prerequisites
-
-- **Node.js** 22.x or newer
-- **MySQL** or **MariaDB** 8.0+
-- **FFmpeg** (optional) — required only for video preview generation; image previews work without it
-- Each end user needs their own **Telegram bot** (via [@BotFather](https://t.me/BotFather)) and a private channel
-
-### Installation
+**Requires:** Node.js 22+, MySQL or MariaDB 8.0+, and a Telegram bot you create with [@BotFather](https://t.me/BotFather) plus a private channel. FFmpeg is optional (video previews only).
 
 ```bash
-# Clone the repository
 git clone https://github.com/Chaerulcp/Teldock.git
-cd Teldock
-
-# Set up the backend
-cd backend
+cd Teldock/backend
 npm install
-cp .env.example .env      # then edit .env (see Configuration)
-npm run migrate           # create database tables
-npm start                 # start the API on port 3001
-
-# Set up the frontend (in a separate terminal)
-cd ../frontend
-npm install
-npm run dev               # start the SPA on port 3000
+cp .env.example .env      # Windows PowerShell: Copy-Item .env.example .env
+npm run migrate           # create the database tables
+npm run dev               # API on http://localhost:3001
 ```
 
-Open **http://localhost:3000**, register an account, then connect your Telegram credentials.
+```bash
+# second terminal
+cd Teldock/frontend
+npm install
+npm run dev               # SPA on http://localhost:3000
+```
 
-### First-Time Setup
+Open **http://localhost:3000**, register, then connect your bot under **Settings → Telegram Integration**. The API refuses to start if `JWT_SECRET`, `REFRESH_TOKEN_SECRET`, or `ENCRYPTION_KEY` is missing or left at a placeholder — generate real values first.
 
-1. Register an account in the web UI.
-2. Go to **Settings → Telegram Integration**.
-3. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token.
-4. Create a private channel and add your bot as an admin with **Post Messages** and **Delete Messages** permissions.
-5. Enter the bot token and chat ID in Settings.
-6. Start uploading files.
+Full walkthrough: **[Installation](https://chaerulcp.github.io/Teldock/guide/installation.html)** · **[Connecting Telegram](https://chaerulcp.github.io/Teldock/guide/telegram-setup.html)**
 
-For a detailed walkthrough, see **[QUICK_START.md](QUICK_START.md)**.
+## Features
 
----
+**Files and organisation**
+
+| Feature | What it does |
+| --- | --- |
+| Chunked uploads | Splits large files into ~18 MB parts and streams them without buffering in memory |
+| Streaming downloads | Reassembles parts with backpressure and resumable `Range` requests |
+| Multi-bot pool | Several bot tokens per account, distributed round-robin for throughput |
+| Version history | Overwriting snapshots the previous content; any version can be restored |
+| Soft delete | Deleted files are recoverable and usage accounting stays consistent |
+| Folders, tags, favourites | Hierarchical folders, user-defined tags, a favourite flag, and saved "smart folder" filters |
+
+**Access and sharing**
+
+| Feature | What it does |
+| --- | --- |
+| Public share links | Optional expiry, download limit, and password protection |
+| Share page | Recipients open `/s/:token`, unlock with a password if needed, and download without an account |
+| WebDAV mount | Mount the drive as an OS folder through the Rclone-compatible `/webdav` endpoint |
+| Previews | In-browser image previews in several sizes, plus video thumbnails (640x360 JPEG with duration) |
 
 ## Configuration
 
-Backend configuration is provided via `backend/.env`. Copy `.env.example` and set the values below.
+Backend settings live in `backend/.env`. The required secrets and the values you are most likely to change:
 
 ```ini
-# Server
 NODE_ENV=development
 PORT=3001
 CORS_ORIGIN=http://localhost:3000
+FRONTEND_URL=http://localhost:3000     # builds absolute share links
 
-# Database
 DB_HOST=localhost
 DB_PORT=3306
-DB_NAME=teldock_db
+DB_NAME=tele_storage_db
 DB_USER=root
-DB_PASSWORD=your_password
+DB_PASSWORD=
 
-# Authentication secrets (required — the server refuses to boot with placeholders)
-JWT_SECRET=<generate-random-secret>
-JWT_EXPIRE=15m
-REFRESH_TOKEN_SECRET=<generate-random-secret>
-REFRESH_TOKEN_EXPIRE=7d
+# Required — the server refuses to boot with placeholders
+JWT_SECRET=<random>
+REFRESH_TOKEN_SECRET=<random>
+ENCRYPTION_KEY=<random>                # changing this later makes stored credentials unreadable
+
 FILE_ACCESS_TOKEN_EXPIRE=5m            # lifetime of signed preview/download URLs
-ENCRYPTION_KEY=<generate-random-secret> # required for bot-token encryption at rest
-
-# Storage / uploads
 TG_PART_SIZE=18874368                  # ~18 MB per part
-MAX_UPLOAD_BYTES=2147483648            # 2 GB max upload
+MAX_UPLOAD_BYTES=2147483648            # 2 GB
+WEBDAV_RATE_LIMIT_MAX=5000             # requests / 15 min on /webdav
 ```
 
-> **Note:** The server validates secrets at startup and fails fast if any required secret is missing or left at a placeholder value. Generate strong random values for `JWT_SECRET`, `REFRESH_TOKEN_SECRET`, and `ENCRYPTION_KEY`.
+Generate a secret with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`.
 
-> **Production credentials:** `TELEGRAM_BOT_TOKEN` / `TELEGRAM_STORAGE_CHAT_ID` are intended for local development and testing only. In production, each user connects their own credentials through Settings.
+Complete reference: **[Environment variables](https://chaerulcp.github.io/Teldock/reference/configuration.html)**
 
----
+## API
 
-## API Reference
+Base URL `http://localhost:3001/api`. Responses use `{ "success": true, "data": ... }` or `{ "success": false, "error": "..." }`; protected routes take `Authorization: Bearer <token>`.
 
-**Base URL:** `http://localhost:3001/api`
+| Area | Endpoints |
+| --- | --- |
+| Auth | `POST /auth/register` · `POST /auth/login` · `POST /auth/refresh` · `GET /auth/me` |
+| Files | `POST /files/upload` · `GET /files` · `GET /files/search` · `PATCH /files/:id` · `DELETE /files/:id` · `POST /files/bulk` |
+| Transfer | `POST /files/:id/download-url` · `GET /files/:id/download` · `POST /files/:id/preview-url` · `GET /files/:id/preview` |
+| Versions | `GET /files/:id/versions` · `POST /files/:id/revert/:versionId` |
+| Sharing | `POST /files/:id/share` · `GET /files/s/:token` (public) · `GET /shares` · `DELETE /shares/:id` |
+| Organisation | `/folders` · `/tags` · `/smart-folders` |
+| Telegram | `POST /user/telegram/connect` · `GET /user/telegram/status` · `DELETE /user/telegram/unlink` · `/bots` |
+| Media | `POST /previews/generate` · `GET /stats/storage` · `GET /stats/duplicates` |
+| WebDAV | `OPTIONS` `PROPFIND` `GET` `HEAD` `PUT` `DELETE` `MKCOL` `MOVE` on `/webdav/*` (HTTP Basic) |
 
-### Conventions
+Rate limits: 100 requests / 15 minutes globally, 20 login attempts / hour, and failed WebDAV authentication capped at 20 / 15 minutes.
 
-- All responses use a consistent envelope: `{ "success": true, "data": ... }` on success or `{ "success": false, "error": "..." }` on failure.
-- Protected endpoints require an `Authorization: Bearer <access-token>` header.
-- Rate limits: **100 requests / 15 minutes** globally, and **20 attempts / hour** on `POST /auth/login`.
+Full request and response examples: **[API reference](https://chaerulcp.github.io/Teldock/reference/api.html)**
 
-### Authentication — `/api/auth`
+## Security
 
-| Method | Endpoint         | Auth   | Description                                   |
-| ------ | ---------------- | ------ | --------------------------------------------- |
-| `POST` | `/auth/register` | Public | Register a new user                           |
-| `POST` | `/auth/login`    | Public | Obtain access and refresh tokens              |
-| `POST` | `/auth/refresh`  | Public | Rotate the access token using a refresh token |
-| `GET`  | `/auth/me`       | Bearer | Get the current user's profile                |
+| Concern | Mechanism |
+| --- | --- |
+| Bot tokens | Encrypted at rest, never returned to the client |
+| Passwords | bcrypt with a configurable cost factor (`BCRYPT_ROUNDS`) |
+| File access | Short-lived, file-scoped signed URLs; Telegram IDs stripped from responses |
+| Abuse | Global rate limiting, stricter login limits, and per-attempt WebDAV auth limits |
+| Input | Zod schema validation at the route boundary; parameterised queries via Sequelize |
+| Transport | Helmet Content Security Policy; run behind HTTPS in production |
 
-### Files — `/api/files`
+Files never persist on the server disk, each user's data stays in their own channel, and there is no third-party analytics. Hardening history is tracked in **[SECURITY_CHANGES.md](SECURITY_CHANGES.md)**.
 
-| Method   | Endpoint                       | Auth                | Description                                   |
-| -------- | ------------------------------ | ------------------- | --------------------------------------------- |
-| `POST`   | `/files/upload`                | Bearer              | Upload a file (streamed multipart)            |
-| `GET`    | `/files`                       | Bearer              | List files (paginated, filterable by folder)  |
-| `GET`    | `/files/search?q=`             | Bearer              | Search files by name                          |
-| `POST`   | `/files/bulk`                  | Bearer              | Bulk delete or move selected files            |
-| `POST`   | `/files/:id/download-url`      | Bearer              | Create a short-lived signed download URL      |
-| `GET`    | `/files/:id/download`          | Signed URL / Bearer | Stream a download (supports `Range`)          |
-| `POST`   | `/files/:id/preview-url`       | Bearer              | Create a short-lived signed preview URL       |
-| `GET`    | `/files/:id/preview`           | Signed URL / Bearer | Stream an inline preview (supports `Range`)   |
-| `GET`    | `/files/:id/versions`          | Bearer              | List version history                          |
-| `POST`   | `/files/:id/revert/:versionId` | Bearer              | Revert a file to a previous version           |
-| `POST`   | `/files/:id/share`             | Bearer              | Create a public share link for a file         |
-| `PATCH`  | `/files/:id`                   | Bearer              | Update file metadata (rename, move, favorite) |
-| `PUT`    | `/files/:id/tags`              | Bearer              | Set the tags on a file                        |
-| `DELETE` | `/files/:id`                   | Bearer              | Soft-delete a file                            |
-| `GET`    | `/files/s/:token`              | Public              | Access a public shared link                   |
+## Development
 
-> Signed preview/download URLs are bound to a single file and disposition and expire after `FILE_ACCESS_TOKEN_EXPIRE` (default 5 minutes). Existing clients may continue using a Bearer access token while migrating to signed URLs. Password-protected shares are accessed by supplying the `X-Share-Password` header.
-
-### Folders — `/api/folders`
-
-| Method   | Endpoint                       | Auth   | Description                 |
-| -------- | ------------------------------ | ------ | --------------------------- |
-| `GET`    | `/folders?parentFolderId=`     | Bearer | List folders under a parent |
-| `POST`   | `/folders`                     | Bearer | Create a folder             |
-| `PUT`    | `/folders/:id`                 | Bearer | Rename a folder             |
-| `DELETE` | `/folders/:id`                 | Bearer | Delete a folder             |
-
-### Telegram Integration — `/api/user`
-
-| Method   | Endpoint                 | Auth   | Description                             |
-| -------- | ------------------------ | ------ | --------------------------------------- |
-| `POST`   | `/user/telegram/connect` | Bearer | Connect a bot token and storage channel |
-| `PUT`    | `/user/telegram/config`  | Bearer | Update the Telegram configuration       |
-| `GET`    | `/user/telegram/status`  | Bearer | Get the connection status               |
-| `DELETE` | `/user/telegram/unlink`  | Bearer | Disconnect Telegram                     |
-
-### Multi-Bot Pool — `/api/bots`
-
-| Method   | Endpoint    | Auth   | Description                           |
-| -------- | ----------- | ------ | ------------------------------------- |
-| `GET`    | `/bots`     | Bearer | List the user's bot pool              |
-| `POST`   | `/bots`     | Bearer | Add a validated bot token to the pool |
-| `DELETE` | `/bots/:id` | Bearer | Remove a bot from the pool            |
-
-### Sharing — `/api/shares`
-
-| Method   | Endpoint      | Auth   | Description                   |
-| -------- | ------------- | ------ | ----------------------------- |
-| `GET`    | `/shares`     | Bearer | List the user's active shares |
-| `DELETE` | `/shares/:id` | Bearer | Revoke a share                |
-
-> Share links are **created** with `POST /files/:id/share`; `/api/shares` manages existing shares.
-
-### Tags — `/api/tags`
-
-| Method   | Endpoint    | Auth   | Description  |
-| -------- | ----------- | ------ | ------------ |
-| `GET`    | `/tags`     | Bearer | List tags    |
-| `POST`   | `/tags`     | Bearer | Create a tag |
-| `PUT`    | `/tags/:id` | Bearer | Update a tag |
-| `DELETE` | `/tags/:id` | Bearer | Delete a tag |
-
-### Smart Folders — `/api/smart-folders`
-
-| Method   | Endpoint             | Auth   | Description           |
-| -------- | -------------------- | ------ | --------------------- |
-| `GET`    | `/smart-folders`     | Bearer | List saved filters    |
-| `POST`   | `/smart-folders`     | Bearer | Create a saved filter |
-| `DELETE` | `/smart-folders/:id` | Bearer | Delete a saved filter |
-
-### Previews & Stats
-
-| Method | Endpoint             | Auth   | Description                                       |
-| ------ | -------------------- | ------ | ------------------------------------------------- |
-| `POST` | `/previews/generate` | Bearer | Generate image or video previews for an owned file |
-| `GET`  | `/stats/storage`     | Bearer | Storage usage statistics                          |
-| `GET`  | `/stats/duplicates`  | Bearer | Duplicate-file statistics                         |
-
-### WebDAV (Rclone-compatible) — `/webdav`
-
-```
-PROPFIND, GET, PUT, DELETE, MKCOL, MOVE  /webdav/*
-Authentication: HTTP Basic (email:password)
+```bash
+cd backend
+npm run dev      # nodemon with hot reload
+npm test         # Node test runner
+npm run lint     # ESLint
+npm run format   # Prettier
 ```
 
-### Health
+```bash
+cd frontend
+npm run dev      # Vite dev server
+npm run build    # production bundle
+npm test         # Vitest
+```
 
-| Method | Endpoint      | Description          |
-| ------ | ------------- | -------------------- |
-| `GET`  | `/api/health` | Service health check |
+The end-to-end suite needs a running backend and frontend plus Telegram credentials in `backend/.env`; it creates and cleans up its own fixtures.
 
----
+```bash
+cd e2e
+npm install
+npm test
+```
 
-## Security & Privacy
+CI runs backend lint and tests plus a frontend production build on every push to `main` and every pull request. The documentation site deploys separately.
 
-### Protection Mechanisms
-
-| Concern       | Mechanism                                                    |
-| ------------- | ------------------------------------------------------------ |
-| Bot tokens    | Encrypted at rest; never returned to the client              |
-| Passwords     | Bcrypt-hashed with a configurable cost factor                |
-| File streams  | Authorized via short-lived, file-scoped signed URLs          |
-| File metadata | Internal Telegram IDs are excluded from API responses        |
-| Abuse         | Rate limiting on the global API and stricter limits on login |
-| XSS           | Input sanitization and a strict Content-Security-Policy      |
-| SQL injection | Parameterized queries via Sequelize                          |
-
-### Data Privacy
-
-- **Files never persist on your server disk** — content is streamed to and from Telegram.
-- **Per-user isolation** — a user's files land only in their own channel via their own credentials.
-- **No third-party analytics** — Teldock is pure self-hosted software.
-- **Open source** — the entire implementation is auditable in this repository.
-
-Recent hardening work is tracked in **[SECURITY_CHANGES.md](SECURITY_CHANGES.md)**.
-
----
-
-## Project Structure
+## Project structure
 
 ```
 Teldock/
 ├── backend/
 │   ├── src/
-│   │   ├── routes/         # Endpoint definitions + middleware
+│   │   ├── routes/         # endpoint definitions + middleware
 │   │   ├── controllers/    # HTTP request/response handling
-│   │   ├── services/       # Business logic (Telegram, streaming, previews)
+│   │   ├── services/       # Telegram gateway, chunking, streaming, previews
 │   │   ├── models/         # Sequelize models
-│   │   ├── middleware/     # Auth, validation, file access
-│   │   └── validation/     # Zod schemas
-│   ├── scripts/            # Database migrations & utilities
+│   │   ├── middleware/     # auth, validation, file access
+│   │   ├── validation/     # Zod schemas
+│   │   └── config/         # database, secrets, security
+│   ├── scripts/            # migrations and utilities
 │   └── tests/              # Node test suite
-├── frontend/
-│   └── src/
-│       ├── pages/          # Route-level views
-│       ├── components/     # Reusable UI components
-│       └── services/       # API client
-└── .github/workflows/      # CI pipeline
+├── frontend/src/           # pages, components, API client, stores
+├── e2e/                    # Playwright suite
+├── docs-site/              # VitePress documentation (EN / ID)
+└── assets/readme/          # README visuals
 ```
 
----
-
-## Development
-
-### Backend
-
-```bash
-cd backend
-npm run dev        # start with hot reload (nodemon)
-npm test           # run the test suite
-npm run lint       # run ESLint
-npm run format     # apply Prettier formatting
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm run dev        # start the Vite dev server
-npm run build      # produce a production build
-npm run preview    # preview the production build
-```
-
-### Continuous Integration
-
-Every push to `main` and every pull request runs the GitHub Actions pipeline in
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml): backend lint and tests, plus a frontend production build.
-
----
+The backend follows `routes → controllers → services → models`. More detail: **[Project structure](https://chaerulcp.github.io/Teldock/reference/project-structure.html)** · **[Database schema](https://chaerulcp.github.io/Teldock/reference/database-schema.html)**
 
 ## Documentation
 
-Full documentation is available as a bilingual (English / Bahasa Indonesia) site built with
-VitePress, in the [`docs-site/`](docs-site) directory.
+Full documentation is published in **English and Bahasa Indonesia** at **<https://chaerulcp.github.io/Teldock/>**, covering installation, Telegram setup, configuration, usage, sharing, the multi-bot pool, WebDAV, deployment, security, the API, and troubleshooting.
 
-| Document                                   | Purpose                               |
-| ------------------------------------------ | ------------------------------------- |
-| [README.md](README.md)                     | Project overview (this document)      |
-| [QUICK_START.md](QUICK_START.md)           | Step-by-step setup guide              |
-| [USER_GUIDE.md](USER_GUIDE.md)             | End-user usage guide                  |
-| [DEPLOYMENT.md](DEPLOYMENT.md)             | Production deployment guide           |
-| [CONTRIBUTING.md](CONTRIBUTING.md)         | Contribution guidelines and standards |
-| [SECURITY_CHANGES.md](SECURITY_CHANGES.md) | Security improvement log              |
-
-### Docs site
-
-The `docs-site/` workspace contains the complete, searchable documentation: installation,
-configuration, Telegram setup, usage, sharing, multi-bot pool, WebDAV/Rclone, deployment,
-security, API reference, database schema, and troubleshooting.
+The source lives in [`docs-site/`](docs-site):
 
 ```bash
 cd docs-site
 npm install
-npm run docs:dev      # local dev server
-npm run docs:build    # production build into .vitepress/dist
-npm run docs:preview  # preview the production build
+npm run docs:dev     # local preview
+npm run docs:build   # production build
 ```
 
-The site is published to GitHub Pages by [`.github/workflows/deploy-docs.yml`](.github/workflows/deploy-docs.yml).
-To enable it, set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**.
-
----
+Additional root-level guides: [QUICK_START.md](QUICK_START.md) · [USER_GUIDE.md](USER_GUIDE.md) · [DEPLOYMENT.md](DEPLOYMENT.md) · [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Contributing
 
 Contributions are welcome.
 
-- Read **[CONTRIBUTING.md](CONTRIBUTING.md)** for coding standards and the PR process.
-- Browse **[GitHub Issues](https://github.com/Chaerulcp/Teldock/issues)** to report bugs or request features.
-- Look for issues labeled `good first issue` or `help wanted` for entry points.
-
-### Code Style
-
-- [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, etc.)
-- Modern JavaScript with `async`/`await`
-- Layered architecture: `routes → controllers → services → models`
-- Tests for critical paths; keep the CI pipeline green
-
----
+- Read **[CONTRIBUTING.md](CONTRIBUTING.md)** for standards and the pull-request process.
+- Report bugs or request features in **[GitHub Issues](https://github.com/Chaerulcp/Teldock/issues)**.
+- Commits follow [Conventional Commits](https://www.conventionalcommits.org/); keep CI green.
 
 ## License
 
 Licensed under the [MIT License](LICENSE).
 
----
-
 ## Disclaimer
 
-> **Important: read before using.**
+> **Read before using.**
 
-Teldock is a **non-commercial, open-source educational project**. Using Telegram's Bot API as general-purpose cloud storage is **not an intended use** of Telegram's platform and may violate Telegram's [Terms of Service](https://telegram.org/tos).
+Teldock is a **non-commercial, open-source educational project**. Using Telegram's Bot API as general-purpose cloud storage is **not an intended use** of Telegram's platform and may violate its [Terms of Service](https://telegram.org/tos).
 
-### Your Responsibilities
-
-- Use it only with data you own or have the rights to store.
+- Use it only with data you own or have the right to store.
 - Do not use it for mass or commercial storage.
-- Be aware that Telegram may rate-limit, suspend, or delete abusive accounts and files.
-- Keep independent backups of important data — **do not treat Teldock as reliable primary storage.**
+- Telegram may rate-limit, suspend, or delete abusive accounts and files.
+- Keep independent backups — **do not treat Teldock as reliable primary storage.**
 
-The authors are **not liable** for any damages arising from use of this software.
+The authors are **not liable** for damages arising from use of this software.
 
----
+## Acknowledgements
 
-## Acknowledgments
-
-Inspired by [teldrive](https://github.com/teldrive/teldrive), a pioneering implementation of Telegram-based file hosting.
-
-Built with the Telegram Bot API, Express, React, and Sequelize.
+Inspired by [teldrive](https://github.com/teldrive/teldrive), a pioneering implementation of Telegram-based file hosting. Built with the Telegram Bot API, Express, React, and Sequelize.

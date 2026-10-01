@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="380" viewBox="0 0 1200 380" role="img" aria-labelledby="heroTitle heroDesc">
+  <title id="heroTitle">Teldock — self-hosted cloud storage backed by your own Telegram bot</title>
+  <desc id="heroDesc">A file is split into roughly 18 MB parts and streamed to your own private Telegram channel, then reassembled on download.</desc>
+
+  <defs>
+    <linearGradient id="heroWash" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#10b981" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#229ED9" stop-opacity="0.05"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="380" rx="26" fill="#0e1116"/>
+  <rect x="620" width="580" height="380" rx="26" fill="url(#heroWash)"/>
+
+  <g id="title-block" transform="translate(64 62)">
+    <text x="0" y="0" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" letter-spacing="2.2" fill="#8592a6">SELF-HOSTED · TELEGRAM-BACKED</text>
+    <text x="0" y="84" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="76" font-weight="700" fill="#e7eef2">Teldock</text>
+    <text x="0" y="132" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="24" fill="#b0b9c7">Your own cloud drive, with a Telegram</text>
+    <text x="0" y="166" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="24" fill="#b0b9c7">bot and private channel as the backend.</text>
+    <g id="meta">
+      <circle cx="5" cy="206" r="4" fill="#10b981"/>
+      <text x="20" y="213" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#66748c">Node 22 · React 18 · MySQL · MIT</text>
+    </g>
+  </g>
+
+  <g id="project-proof" transform="translate(690 62)">
+    <text x="0" y="0" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" letter-spacing="1.6" fill="#8592a6">HOW A FILE MOVES</text>
+
+    <rect x="0" y="22" width="198" height="50" rx="12" fill="#131d24" stroke="#24313a"/>
+    <rect x="0" y="22" width="4" height="50" rx="2" fill="#10b981"/>
+    <text x="18" y="54" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" fill="#e7eef2">file.bin</text>
+    <text x="182" y="54" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#66748c">1.2 GB</text>
+
+    <path d="M99 76 v12" stroke="#3a4150" stroke-width="2"/>
+    <polygon points="99,96 93,86 105,86" fill="#3a4150"/>
+
+    <g id="parts">
+      <rect x="0" y="98" width="42" height="46" rx="10" fill="#131d24" stroke="#24313a"/>
+      <rect x="52" y="98" width="42" height="46" rx="10" fill="#131d24" stroke="#24313a"/>
+      <rect x="104" y="98" width="42" height="46" rx="10" fill="#131d24" stroke="#24313a"/>
+      <rect x="156" y="98" width="42" height="46" rx="10" fill="#131d24" stroke="#24313a"/>
+      <text x="21" y="128" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" fill="#8592a6">1</text>
+      <text x="73" y="128" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" fill="#8592a6">2</text>
+      <text x="125" y="128" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" fill="#8592a6">3</text>
+      <text x="177" y="128" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" fill="#8592a6">4</text>
+    </g>
+    <text x="0" y="170" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#66748c">~18 MB parts, streamed</text>
+
+    <path d="M99 182 v12" stroke="#3a4150" stroke-width="2"/>
+    <polygon points="99,202 93,192 105,192" fill="#3a4150"/>
+
+    <rect x="0" y="206" width="446" height="56" rx="14" fill="#0b2b3a" stroke="#1d5f80"/>
+    <circle cx="32" cy="234" r="5" fill="#229ED9"/>
+    <text x="50" y="241" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="20" fill="#7cc9ee">Telegram private channel</text>
+  </g>
+</svg>
