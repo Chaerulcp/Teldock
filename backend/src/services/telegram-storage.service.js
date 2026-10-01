@@ -68,7 +68,13 @@ class TelegramStorageService {
     }
 
     sanitizeFilename(filename) {
-        return filename.replace(/[<>:"\\|?*]/g, '_').substring(0, 100).trim();
+        // Path separators are included so a supplied name cannot address
+        // another directory once it is persisted or mapped to a path.
+        const sanitized = String(filename).replace(/[<>:"\\|?*/]/g, '_').substring(0, 100).trim();
+        if (sanitized.length === 0 || /^\.+$/.test(sanitized)) {
+            return 'unnamed-file';
+        }
+        return sanitized;
     }
 
     /**

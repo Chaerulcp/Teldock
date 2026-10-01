@@ -27,7 +27,7 @@ Day-to-day use is handled through the web UI: organize files into folders, find 
 | --- | --- |
 | Folder structure | Hierarchical folders with path-based navigation. |
 | Search and filter | Filename search, favorites, tags, and saved "smart folder" filters. |
-| File preview | In-browser image previews in multiple sizes (WebP-optimized). |
+| File preview | In-browser image previews in multiple sizes (WebP-optimized), plus video thumbnails (a 640x360 JPEG frame captured at the 1-second mark with the duration when available). |
 | Sharing | Public links with optional expiration, download limits, and password protection. |
 | WebDAV mount | Mount Teldock as an OS drive through the Rclone-compatible `/webdav` endpoint. |
 

@@ -13,7 +13,7 @@ Halaman ini menjelaskan cara menjalankan Teldock di komputer Anda sendiri: backe
 | --- | --- |
 | Node.js | 22.x atau lebih baru (20+ bisa, 22.x disarankan) |
 | MySQL / MariaDB | 8.0 atau lebih baru, sudah berjalan dan dapat diakses |
-| FFmpeg | Tidak wajib. Teldock menghasilkan pratinjau gambar di dalam proses; pembuatan thumbnail video belum tersedia di kode saat ini. |
+| FFmpeg | Opsional. Hanya diperlukan untuk pembuatan pratinjau video. Pratinjau gambar memakai Sharp dan tidak membutuhkan FFmpeg; tanpa FFmpeg, pratinjau video mengembalikan `503`. |
 | Bot + channel Telegram | Setiap pengguna memerlukan **bot sendiri** (lewat [@BotFather](https://t.me/BotFather)) dan channel penyimpanan privat. |
 
 ::: info Model multi-user

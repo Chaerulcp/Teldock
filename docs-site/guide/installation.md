@@ -13,7 +13,7 @@ This page walks through running Teldock on your own machine: the Node.js backend
 | --- | --- |
 | Node.js | 22.x or newer (20+ works, 22.x recommended) |
 | MySQL / MariaDB | 8.0 or newer, running and reachable |
-| FFmpeg | Not required. Teldock generates image previews in-process; video thumbnail generation is not exposed by the current code. |
+| FFmpeg | Optional. Required only for video preview generation. Image previews use Sharp and need no FFmpeg; without FFmpeg installed, video previews return `503`. |
 | Telegram bot + channel | Each end user needs their **own** bot (via [@BotFather](https://t.me/BotFather)) and a private storage channel. |
 
 ::: info Multi-user model

@@ -70,7 +70,7 @@ Teldock turns a Telegram bot and a private channel into a personal cloud drive. 
 | -------------------- | -------------------------------------------------------------------------------- |
 | **Folder Structure** | Hierarchical folders with path-based navigation.                                 |
 | **Search & Filter**  | Filename search, favorites, tags, and saved "smart folder" filters.              |
-| **File Preview**     | In-browser image previews in multiple sizes (WebP-optimized).                    |
+| **File Preview**     | In-browser image previews in multiple sizes (WebP-optimized), plus video thumbnails (a 640x360 JPEG frame at the 1-second mark with the duration). Video previews are capped at 25 MB, so most large videos are rejected. |
 | **Sharing**          | Public links with optional expiration, download limits, and password protection. |
 | **WebDAV Mount**     | Mount Teldock as an OS drive through the Rclone-compatible `/webdav` endpoint.   |
 
@@ -126,7 +126,7 @@ routes → controllers → services → models
 | **Authentication**   | JSON Web Tokens (access + refresh)                  |
 | **Validation**       | Zod schema validation                               |
 | **Real-time sync**   | Socket.IO WebSocket channel                         |
-| **Media processing** | Sharp (image previews)                              |
+| **Media processing** | Sharp (image previews); FFmpeg (video previews, optional) |
 | **Frontend**         | React 18, Vite, Tailwind CSS, Zustand, React Router |
 
 ---
@@ -137,6 +137,7 @@ routes → controllers → services → models
 
 - **Node.js** 22.x or newer
 - **MySQL** or **MariaDB** 8.0+
+- **FFmpeg** (optional) — required only for video preview generation; image previews work without it
 - Each end user needs their own **Telegram bot** (via [@BotFather](https://t.me/BotFather)) and a private channel
 
 ### Installation
@@ -307,7 +308,7 @@ MAX_UPLOAD_BYTES=2147483648            # 2 GB max upload
 
 | Method | Endpoint             | Auth   | Description                                       |
 | ------ | -------------------- | ------ | ------------------------------------------------- |
-| `POST` | `/previews/generate` | Bearer | Generate resized image previews for an owned file |
+| `POST` | `/previews/generate` | Bearer | Generate image or video previews for an owned file |
 | `GET`  | `/stats/storage`     | Bearer | Storage usage statistics                          |
 | `GET`  | `/stats/duplicates`  | Bearer | Duplicate-file statistics                         |
 

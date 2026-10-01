@@ -57,12 +57,13 @@ Peroleh token dari `POST /auth/register` atau `POST /auth/login`, lalu perbarui 
 | `403` | Token tidak valid/kedaluwarsa, atau pemanggil bukan pemilik resource. |
 | `404` | Resource yang diminta tidak ada. |
 | `409` | Konflik (user, folder, atau tag duplikat; file terenkripsi tidak bisa di-preview). |
-| `413` | Upload melebihi `MAX_UPLOAD_BYTES`. |
+| `413` | Upload melebihi `MAX_UPLOAD_BYTES`, atau sumber pratinjau melebihi batas pratinjau 25 MB. |
 | `415` | Upload WebDAV ditolak oleh whitelist MIME. |
 | `416` | Rentang byte yang diminta tidak dapat dipenuhi. |
 | `429` | Rate limit terlampaui. |
 | `500` | Error server tak terduga. |
 | `502` | Download dari Telegram gagal saat streaming shared link. |
+| `503` | FFmpeg tidak terpasang, sehingga pratinjau video tidak tersedia. |
 
 ## Rate limit dan header
 
@@ -594,10 +595,40 @@ Base path: `/api/previews`
 
 | Method | Path | Auth | Deskripsi |
 | --- | --- | --- | --- |
-| `POST` | `/previews/generate` | Bearer | Membuat preview gambar yang di-resize. |
+| `POST` | `/previews/generate` | Bearer | Membuat pratinjau untuk file gambar atau video milik pemanggil. |
 
-Request: `{ "fileId": "7c9e6679-7425-40de-944b-e07fc1f90ae7" }`. Hanya file gambar hingga 25 MB yang
-didukung; file lebih besar mengembalikan `413`. Response berisi data URL base64.
+Request: `{ "fileId": "7c9e6679-7425-40de-944b-e07fc1f90ae7" }`. File harus milik pemanggil. File
+gambar (`image/*`) dan video (`video/*`) hingga 25 MB didukung; file lebih besar mengembalikan
+`413`. Response berisi data URL base64.
+
+Untuk gambar, `data.previews` berisi varian hasil resize (tidak berubah). Untuk video, response
+menambahkan penanda `type: "video"` dan mengembalikan satu thumbnail JPEG 640x360 yang diambil pada
+detik ke-1, plus durasi dalam detik (`null` bila tidak dapat dibaca):
+
+```json
+{
+  "success": true,
+  "data": {
+    "type": "video",
+    "previews": {
+      "thumbnail": {
+        "dataUrl": "data:image/jpeg;base64,...",
+        "dimensions": { "width": 640, "height": 360 },
+        "fileSize": 15021
+      }
+    },
+    "duration": 2,
+    "processingTime": 123
+  }
+}
+```
+
+Pratinjau video memerlukan FFmpeg di server; bila binary `ffmpeg` tidak tersedia, endpoint
+mengembalikan `503`, sedangkan pratinjau gambar tetap berfungsi. Karena kedua pipeline menyangga
+sumber di memori, pratinjau video dibatasi 25 MB dan sebagian besar video berukuran besar
+melewatinya. Kode status pratinjau video: `400` (tipe MIME bukan gambar maupun video), `403`
+(pemanggil bukan pemilik file), `404` (file tidak ditemukan), `413` (sumber melebihi batas 25 MB),
+`503` (FFmpeg tidak terpasang), `500` (kegagalan lain).
 
 ## Stats
 

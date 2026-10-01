@@ -27,7 +27,7 @@ Penggunaan sehari-hari dilakukan melalui antarmuka web: rapikan file ke dalam fo
 | --- | --- |
 | Struktur folder | Folder hierarkis dengan navigasi berbasis path. |
 | Pencarian dan filter | Pencarian nama file, favorit, tag, dan filter "smart folder" tersimpan. |
-| Pratinjau file | Pratinjau gambar di browser dalam beberapa ukuran (dioptimalkan WebP). |
+| Pratinjau file | Pratinjau gambar di browser dalam beberapa ukuran (dioptimalkan WebP), plus thumbnail video (frame JPEG 640x360 pada detik ke-1 beserta durasinya bila tersedia). |
 | Berbagi | Tautan publik dengan masa kedaluwarsa, batas unduhan, dan perlindungan kata sandi opsional. |
 | WebDAV mount | Pasang Teldock sebagai drive OS melalui endpoint `/webdav` yang kompatibel dengan Rclone. |
 

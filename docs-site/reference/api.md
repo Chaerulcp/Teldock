@@ -57,12 +57,13 @@ Obtain a token from `POST /auth/register` or `POST /auth/login`, and renew it wi
 | `403` | Token invalid/expired, or the caller does not own the resource. |
 | `404` | The requested resource does not exist. |
 | `409` | Conflict (duplicate user, folder, or tag; encrypted file cannot be previewed). |
-| `413` | Upload exceeds `MAX_UPLOAD_BYTES`. |
+| `413` | Upload exceeds `MAX_UPLOAD_BYTES`, or a preview source exceeds the 25 MB preview cap. |
 | `415` | WebDAV upload rejected by the MIME whitelist. |
 | `416` | Requested byte range is not satisfiable. |
 | `429` | Rate limit exceeded. |
 | `500` | Unexpected server error. |
 | `502` | Telegram download failed while streaming a shared link. |
+| `503` | FFmpeg is not installed, so video previews are unavailable. |
 
 ## Rate limits and headers
 
@@ -592,10 +593,40 @@ Base path: `/api/previews`
 
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |
-| `POST` | `/previews/generate` | Bearer | Generate resized image previews. |
+| `POST` | `/previews/generate` | Bearer | Generate previews for an owned image or video file. |
 
-Request: `{ "fileId": "7c9e6679-7425-40de-944b-e07fc1f90ae7" }`. Only image files up to 25 MB are
-supported; larger files return `413`. The response contains base64 data URLs.
+Request: `{ "fileId": "7c9e6679-7425-40de-944b-e07fc1f90ae7" }`. The file must belong to the
+caller. Image (`image/*`) and video (`video/*`) files up to 25 MB are supported; larger files
+return `413`. The response contains base64 data URLs.
+
+For images, `data.previews` holds the resized variants (unchanged). For videos, the response adds a
+`type: "video"` marker and returns a single 640x360 JPEG thumbnail captured at the 1-second mark,
+plus the duration in seconds (`null` when it cannot be read):
+
+```json
+{
+  "success": true,
+  "data": {
+    "type": "video",
+    "previews": {
+      "thumbnail": {
+        "dataUrl": "data:image/jpeg;base64,...",
+        "dimensions": { "width": 640, "height": 360 },
+        "fileSize": 15021
+      }
+    },
+    "duration": 2,
+    "processingTime": 123
+  }
+}
+```
+
+Video previews require FFmpeg on the server; when the `ffmpeg` binary is unavailable the endpoint
+returns `503`, while image previews keep working. Because both pipelines buffer the source in
+memory, video previews are capped at 25 MB and most large videos exceed it. Video preview status
+codes: `400` (MIME type is neither image nor video), `403` (caller does not own the file), `404`
+(file not found), `413` (source exceeds the 25 MB cap), `503` (FFmpeg not installed), `500` (other
+failure).
 
 ## Stats
 

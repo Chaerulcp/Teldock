@@ -29,6 +29,7 @@ Complete guides for deploying **Teldock** in various production environments. Wh
 - [ ] Domain name configured (optional but recommended)
 - [ ] SSL certificates ready (or using Let's Encrypt)
 - [ ] MySQL/MariaDB server accessible
+- [ ] FFmpeg installed (optional) — only needed for video preview generation
 - [ ] Bot tokens prepared for each user
 
 ### Security Requirements
@@ -108,6 +109,9 @@ sudo apt install -y nodejs
 # Install MySQL
 sudo apt install -y mysql-server
 sudo mysql_secure_installation
+
+# Install FFmpeg (optional — required only for video preview generation)
+sudo apt install -y ffmpeg
 
 # Install Git
 sudo apt install -y git
