@@ -15,13 +15,47 @@ Semua perubahan penting pada proyek ini didokumentasikan di sini. Formatnya meng
 
 - Belum ada.
 
+## [1.1.0]
+
+### Added
+
+- **Halaman share publik.** Penerima tautan berbagi kini mendarat di halaman sungguhan pada
+  `/s/:token`, bukan dialihkan ke landing page. Halaman ini menangani permintaan password,
+  menampilkan metadata file, dan mengunduh file tanpa perlu akun.
+- **Pratinjau video.** `POST /api/previews/generate` menerima `video/*` selain gambar dan
+  mengembalikan thumbnail JPEG 640x360 yang diambil pada detik pertama, beserta durasi video bila
+  dapat dibaca. Memerlukan FFmpeg; video yang melebihi batas pratinjau 25 MB ditolak dengan `413`.
+- **Situs dokumentasi.** Situs dokumentasi bilingual (Inggris / Bahasa Indonesia) lengkap yang
+  dibangun dengan VitePress, dipublikasikan ke GitHub Pages dan di-deploy otomatis pada setiap push
+  ke `main`.
+- **Suite test end-to-end.** Suite Playwright mandiri di folder `e2e/` yang mencakup alur share
+  publik, termasuk jalur password salah.
+- **Suite test frontend.** Vitest dan Testing Library, mencakup halaman share dan klien API share
+  publik.
+
 ### Changed
 
-- Belum ada.
+- `BCRYPT_ROUNDS` kini dibaca dari environment, tidak lagi dikunci di kode. Nilai di luar rentang
+  aman 4-15 akan kembali ke `12` disertai peringatan.
+- Rate limiting WebDAV dipecah menjadi batas umum yang longgar (5000 permintaan per 15 menit, dapat
+  diatur via `WEBDAV_RATE_LIMIT_MAX`) dan batas terpisah 20 per 15 menit untuk percobaan
+  autentikasi yang **gagal**, sehingga klien yang di-mount tidak lagi ter-throttle.
+- Suite test backend tumbuh dari 36 menjadi 114 test, mencakup schema validasi, layanan JWT,
+  middleware, dan helper nama file.
+- Menghapus dependency `form-data` dan `multer` yang tidak terpakai beserta mesin upload multer yang
+  sudah mati.
 
 ### Fixed
 
-- Belum ada.
+- **Tautan berbagi tidak dapat dibuat dua kali dalam detik yang sama.** Token share tidak memiliki
+  nonce unik, sehingga dua tautan untuk file yang sama yang dibuat dalam satu detik menghasilkan JWT
+  identik dan permintaan kedua gagal dengan `500`. Token kini menyertakan `jti` acak.
+- `CORS` tidak mengizinkan `PATCH`, sehingga rename, move, dan favorite file terblokir dari browser.
+- `sanitizeFilename` tidak menetralkan pemisah path atau token direktori polos, padahal
+  didokumentasikan sebagai pencegah masalah keamanan.
+- `FRONTEND_URL` tidak ada di `.env.example`, sehingga menghasilkan tautan share relatif.
+- Dokumentasi menjelaskan fitur yang tidak diimplementasikan kode (antrean pratinjau berbasis Redis,
+  thumbnail video FFmpeg, dan setelan `TELEGRAM_API_URL` / `TELEGRAM_API_SERVER_URL`).
 
 ## [1.0.0]
 
