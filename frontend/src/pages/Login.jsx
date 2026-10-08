@@ -57,7 +57,7 @@ function Login() {
             The intelligent knowledge layer for your entire company. Stop searching. Start asking.
           </p>
         </div>
-        <p className="relative text-sm text-ink-500 font-mono">© 2026 Teldock AI Inc.</p>
+        <p className="relative text-sm text-ink-500 font-mono">© 2026 Teldock AI</p>
       </div>
 
       {/* Right: form */}

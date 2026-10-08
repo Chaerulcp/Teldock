@@ -292,7 +292,7 @@ function Landing() {
             </div>
           </div>
           <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-ink-500">
-            <p>© 2026 Teldock AI Inc. All rights reserved.</p>
+            <p>© 2026 Teldock AI. All rights reserved.</p>
             <div className="flex gap-6">
               <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
