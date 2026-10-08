@@ -260,42 +260,28 @@ function Landing() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 bg-[#0A0A0B] pt-20 pb-10">
+      <footer className="border-t border-white/5 bg-[#0A0A0B] py-12">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="grid md:grid-cols-4 gap-12 mb-16">
-            <div className="col-span-2">
-              <div className="flex items-center gap-2 mb-6">
-                <BrainCircuit className="w-6 h-6 text-primary-500" />
-                <span className="font-display font-bold text-xl text-white">Teldock AI</span>
-              </div>
-              <p className="text-ink-400 max-w-sm">
-                The intelligent knowledge layer for your entire company. Stop searching. Start asking.
-              </p>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-12">
+            <div className="flex items-center gap-2">
+              <BrainCircuit className="w-5 h-5 text-primary-500" />
+              <span className="font-display font-bold text-lg text-white">Teldock AI</span>
             </div>
-            <div>
-              <h4 className="text-white font-bold mb-4">Product</h4>
-              <ul className="space-y-3 text-ink-400">
-                <li><a href="#product" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#integrations" className="hover:text-white transition-colors">Integrations</a></li>
-                <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><Link to="/changelog" className="hover:text-white transition-colors">Changelog</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-white font-bold mb-4">Company</h4>
-              <ul className="space-y-3 text-ink-400">
-                <li><Link to="/about" className="hover:text-white transition-colors">About Us</Link></li>
-                <li><Link to="/careers" className="hover:text-white transition-colors">Careers</Link></li>
-                <li><Link to="/blog" className="hover:text-white transition-colors">Blog</Link></li>
-                <li><a href="mailto:contact@teldock.web.id" className="hover:text-white transition-colors">Contact</a></li>
-              </ul>
+            
+            <div className="flex flex-wrap items-center justify-center gap-8 text-sm font-medium text-ink-400">
+              <a href="#product" className="hover:text-white transition-colors">Features</a>
+              <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+              <a href="mailto:contact@teldock.web.id" className="hover:text-white transition-colors">Contact</a>
+              <Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+              <Link to="/terms" className="hover:text-white transition-colors">Terms</Link>
             </div>
           </div>
-          <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-ink-500">
+          
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8 border-t border-white/5 text-sm text-ink-500">
             <p>© 2026 Teldock AI. All rights reserved.</p>
-            <div className="flex gap-6">
-              <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
-              <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500/80 animate-pulse" />
+              <span>All systems normal</span>
             </div>
           </div>
         </div>
