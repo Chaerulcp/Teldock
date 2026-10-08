@@ -121,12 +121,22 @@ app.use((err, req, res, _next) => {
   });
 });
 
-// 404 handler
-app.use((req, res) => {
+// Serve frontend static files
+const path = require("path");
+const frontendDistPath = path.join(__dirname, "../../frontend/dist");
+app.use(express.static(frontendDistPath));
+
+// 404 handler for API routes
+app.use("/api/*", (req, res) => {
   res.status(404).json({
     success: false,
     error: "Route not found",
   });
+});
+
+// SPA Fallback for frontend routing
+app.get("*", (req, res) => {
+  res.sendFile(path.join(frontendDistPath, "index.html"));
 });
 
 // Start server

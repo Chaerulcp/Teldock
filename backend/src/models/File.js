@@ -63,6 +63,12 @@ const File = sequelize.define('File', {
         allowNull: false,
         comment: 'File size in bytes'
     },
+    // AI Metadata
+    aiSummary: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: 'AI-generated summary of the file content'
+    },
     // Chunked / large-file storage (teldrive-style)
     isChunked: {
         type: DataTypes.BOOLEAN,

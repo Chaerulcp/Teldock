@@ -3,7 +3,7 @@ import {
   UploadCloud, FileText, Image as ImageIcon, Video, Music, Download, Share2,
   Trash2, Folder, FolderPlus, Lock, Search, LayoutGrid, List, FileArchive,
   File as FileIcon, ChevronRight, Home, X, Pencil, FolderInput, CheckSquare, Square, History,
-  Star, Tag as TagIcon
+  Star, Tag as TagIcon, Sparkles
 } from 'lucide-react';
 import { fileApi, folderApi } from '../services/api';
 import { toast } from 'react-toastify';
@@ -449,6 +449,7 @@ function Dashboard() {
                         </div>
                         <div className="flex items-center gap-1 mr-6">
                           {file.isEncrypted && <Lock className="w-3.5 h-3.5 text-ink-400" />}
+                          {file.aiSummary && <Sparkles className="w-3.5 h-3.5 text-primary-500" title="Has AI Summary" />}
                           {file.isChunked && <span className="text-[10px] font-mono font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 px-1.5 py-0.5 rounded">{file.partCount}×</span>}
                         </div>
                       </div>
@@ -517,6 +518,7 @@ function Dashboard() {
                             <p onClick={() => openFile(file)} className="text-sm font-medium text-ink-900 dark:text-white truncate cursor-pointer hover:text-primary-600 dark:hover:text-primary-400">{file.displayFilename}</p>
                             {file.isFavorite && <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 flex-shrink-0" />}
                             {file.isEncrypted && <Lock className="w-3.5 h-3.5 text-ink-400 flex-shrink-0" />}
+                            {file.aiSummary && <Sparkles className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" title="Has AI Summary" />}
                             {file.isChunked && <span className="text-[10px] font-mono font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 px-1.5 py-0.5 rounded flex-shrink-0">{file.partCount}×</span>}
                             {file.tags && file.tags.map((t) => (
                               <button key={t.id} onClick={() => setSearchParams({ tagId: t.id })} className="text-[10px] font-medium px-1.5 py-0.5 rounded-full text-white flex-shrink-0" style={{ backgroundColor: t.color }}>{t.name}</button>

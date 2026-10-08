@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, Download, Lock, FileText, Loader2 } from "lucide-react";
+import { X, Download, Lock, FileText, Loader2, Sparkles } from "lucide-react";
 import { fileApi } from "../services/api";
 
 function isImage(m) {
@@ -161,6 +161,22 @@ function FileViewer({ file, onClose }) {
           </div>
         )}
       </div>
+
+      {/* AI Summary Panel */}
+      {file.aiSummary && (
+        <div 
+          className="absolute bottom-6 right-6 max-w-sm bg-ink-900/90 backdrop-blur-md border border-primary-500/30 rounded-2xl p-4 text-white shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="w-4 h-4 text-primary-400" />
+            <h4 className="text-sm font-semibold text-primary-400">AI Summary</h4>
+          </div>
+          <p className="text-sm text-white/90 leading-relaxed">
+            {file.aiSummary}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

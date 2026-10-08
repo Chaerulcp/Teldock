@@ -120,6 +120,40 @@ async function uploadFile({ userId, file, folderId, encrypt, fileLimitReached })
         const result = await persistUpload(userId, file, folderId, uploadResult, transaction);
         await transaction.commit();
 
+        // Async AI Analysis for text files
+        if (file.textContent) {
+            // Run in background without awaiting to return response quickly
+            const aiService = require('./ai.service');
+            aiService.analyzeFileContent(file.textContent, file.originalname)
+                .then(async (aiResult) => {
+                    if (aiResult.summary || (aiResult.tags && aiResult.tags.length > 0)) {
+                        // Update the file with AI summary
+                        await File.update({ aiSummary: aiResult.summary }, { where: { id: result.file.id } });
+                        result.file.aiSummary = aiResult.summary;
+                        
+                        // Set tags if any
+                        if (aiResult.tags.length > 0) {
+                            const fileManagementService = require('./file-management.service');
+                            // We need tag IDs, not names. A simple approach is to find or create tags, 
+                            // then set them using fileManagementService.setFileTags
+                            const { Tag } = require('../models');
+                            const tagIds = [];
+                            for (const tagName of aiResult.tags) {
+                                const [tag] = await Tag.findOrCreate({
+                                    where: { name: tagName, userId },
+                                    defaults: { name: tagName, userId }
+                                });
+                                tagIds.push(tag.id);
+                            }
+                            await fileManagementService.setFileTags(result.file.id, userId, tagIds);
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Background AI analysis failed for file', result.file.id, err);
+                });
+        }
+
         return result;
     } catch (error) {
         await transaction.rollback().catch(() => {});

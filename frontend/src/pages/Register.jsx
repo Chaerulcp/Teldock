@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, User, Lock, Loader2, Cloud, ArrowLeft, Check } from 'lucide-react';
+import { Mail, User, Lock, Loader2, BrainCircuit, ArrowLeft, Check, Sparkles } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../store/auth-store';
 
@@ -55,24 +55,28 @@ function Register() {
     <div className="min-h-[100dvh] grid lg:grid-cols-2 bg-ink-50 dark:bg-ink-950 font-sans">
       {/* Left: brand panel */}
       <div className="hidden lg:flex flex-col justify-between p-12 bg-ink-900 relative overflow-hidden">
-        <div className="absolute -right-20 -top-20 w-80 h-80 bg-primary-500/20 blur-3xl rounded-full" />
-        <div className="absolute inset-0 bg-grid-dark [background-size:32px_32px] opacity-40" />
+        <div className="absolute -right-20 -top-20 w-80 h-80 bg-purple-600/20 blur-[100px] rounded-full mix-blend-screen" />
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
         <Link to="/" className="relative flex items-center gap-2 text-white">
-          <div className="w-9 h-9 rounded-xl bg-primary-500 grid place-items-center">
-            <Cloud className="w-5 h-5 text-white" />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary-500 to-purple-600 grid place-items-center shadow-[0_0_20px_rgba(168,85,247,0.3)]">
+            <BrainCircuit className="w-5 h-5 text-white" />
           </div>
-          <span className="font-display font-bold text-lg">Teldock</span>
+          <span className="font-display font-bold text-xl tracking-tight">Teldock AI</span>
         </Link>
         <div className="relative">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-primary-300 mb-6 backdrop-blur-md">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Powered by Claude Sonnet 5.5</span>
+          </div>
           <h1 className="font-display font-bold text-4xl text-white leading-tight tracking-tight">
-            Start your private<br />Telegram drive.
+            Start building your<br />intelligent knowledge base.
           </h1>
           <ul className="mt-8 space-y-3">
             {[
-              'Self-hosted — you run and control it',
-              'No file size limits — files are chunked',
-              'Optional AES-256 encryption',
-              'Open source under the MIT License',
+              'Connect AWS S3, Google Drive, or Notion',
+              'Auto-tagging & intelligent summarization',
+              'Enterprise-grade AES-256 encryption',
+              'Talk to your data with Claude AI',
             ].map((f) => (
               <li key={f} className="flex items-center gap-3 text-ink-200">
                 <span className="w-5 h-5 rounded-full bg-primary-500/20 grid place-items-center flex-shrink-0">
@@ -83,7 +87,7 @@ function Register() {
             ))}
           </ul>
         </div>
-        <p className="relative text-sm text-ink-500 font-mono">MIT Licensed · Open Source</p>
+        <p className="relative text-sm text-ink-500 font-mono">© 2026 Teldock AI Inc.</p>
       </div>
 
       {/* Right: form */}
@@ -94,7 +98,7 @@ function Register() {
           </Link>
 
           <h2 className="font-display font-bold text-2xl text-ink-900 dark:text-white">Create your account</h2>
-          <p className="mt-2 text-sm text-ink-500 dark:text-ink-400">Local account for your self-hosted instance.</p>
+          <p className="mt-2 text-sm text-ink-500 dark:text-ink-400">Start your 14-day free trial. No credit card required.</p>
 
           <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
             <div>

@@ -75,12 +75,29 @@ function streamUpload(req, res, next) {
       mimetype: info.mimeType,
       size: 0,
       stream: output,
+      textContent: null, // For AI analysis
     };
+    
+    let textBuffer = [];
+    let textBufferSize = 0;
+    const isTextFile = info.mimeType.startsWith("text/") || info.mimeType === "application/json" || info.mimeType === "application/markdown" || info.filename.endsWith('.md') || info.filename.endsWith('.csv');
+
     fileStream.on("data", (chunk) => {
       fileInfo.size += chunk.length;
+      
+      // Buffer up to 100KB for AI analysis if it's a text file
+      if (isTextFile && textBufferSize < 100 * 1024) {
+          textBuffer.push(chunk);
+          textBufferSize += chunk.length;
+      }
     });
     fileStream.on("limit", () => {
       fileInfo.limitReached = true;
+    });
+    fileStream.on("end", () => {
+        if (isTextFile && textBuffer.length > 0) {
+            fileInfo.textContent = Buffer.concat(textBuffer).toString('utf8').substring(0, 100 * 1024); // Cap string size
+        }
     });
     fileStream.on("error", (error) => output.destroy(error));
     fileStream.pipe(output);
