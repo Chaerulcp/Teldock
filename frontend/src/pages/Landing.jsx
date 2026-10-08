@@ -278,15 +278,15 @@ function Landing() {
                 <li><a href="#product" className="hover:text-white transition-colors">Features</a></li>
                 <li><a href="#integrations" className="hover:text-white transition-colors">Integrations</a></li>
                 <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="https://github.com/Chaerulcp/Teldock/releases" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Changelog</a></li>
+                <li><Link to="/changelog" className="hover:text-white transition-colors">Changelog</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="text-white font-bold mb-4">Company</h4>
               <ul className="space-y-3 text-ink-400">
-                <li><a href="https://github.com/Chaerulcp/Teldock" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">About Us</a></li>
-                <li><a href="https://github.com/Chaerulcp/Teldock" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Careers</a></li>
-                <li><a href="https://github.com/Chaerulcp/Teldock" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Blog</a></li>
+                <li><Link to="/about" className="hover:text-white transition-colors">About Us</Link></li>
+                <li><Link to="/careers" className="hover:text-white transition-colors">Careers</Link></li>
+                <li><Link to="/blog" className="hover:text-white transition-colors">Blog</Link></li>
                 <li><a href="mailto:contact@teldock.web.id" className="hover:text-white transition-colors">Contact</a></li>
               </ul>
             </div>
@@ -294,8 +294,8 @@ function Landing() {
           <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-ink-500">
             <p>© 2026 Teldock AI Inc. All rights reserved.</p>
             <div className="flex gap-6">
-              <a href="https://github.com/Chaerulcp/Teldock" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Privacy Policy</a>
-              <a href="https://github.com/Chaerulcp/Teldock" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Terms of Service</a>
+              <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+              <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
             </div>
           </div>
         </div>
